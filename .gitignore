@@ -1,0 +1,19 @@
+# direnv
+*.sw?
+.direnv
+.gopath
+/direnv
+/direnv.test
+/dist
+/test/config
+/test/data
+/test/scenarios/inherited/.envrc
+
+# Rust
+**/*.rs.bk
+*.pdb
+debug/
+target/
+# Creating an executable. Leave the lock here:
+# https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html
+Cargo.lock
