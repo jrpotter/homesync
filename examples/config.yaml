@@ -1,9 +1,10 @@
 remote:
-system:
+  owner: jrpotter
+  name: home-config
 packages:
   homesync:
     configs:
-      - $XDG_CONFIG_HOME/homesync/homesync.yml
-      - $XDG_CONFIG_HOME/homesync.yml
-      - $HOME/.config/homesync/homesync.yml
       - $HOME/.homesync.yml
+      - $HOME/.config/homesync/homesync.yml
+      - $XDG_CONFIG_HOME/homesync.yml
+      - $XDG_CONFIG_HOME/homesync/homesync.yml

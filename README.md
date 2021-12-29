@@ -18,16 +18,16 @@ TODO
 ## Configuration
 
 Homesync uses a YAML file, to be found in anyone of the following locations.
-Locations are searched in the following order:
+Locations are searched in the following priority:
 
-- `$XDG_CONFIG_HOME/homesync/homesync.yml`
-- `$XDG_CONFIG_HOME/homesync.yml`
-- `$HOME/.config/homesync/homesync.yml`
 - `$HOME/.homesync.yml`
+- `$HOME/.config/homesync/homesync.yml`
+- `$XDG_CONFIG_HOME/homesync.yml`
+- `$XDG_CONFIG_HOME/homesync/homesync.yml`
 
 That said, it is recommended to modify this config solely from the exposed
-homesync CLI. Homesync will take responsibility ensuring how the config is
-modified based on your package manager, platform, etc.
+homesync CLI. Homesync will take responsibility ensuring the generated
+configuration is according to package manager, platform, etc.
 
 ## Usage
 
