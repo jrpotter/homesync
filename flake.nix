@@ -14,7 +14,9 @@
         devShell = with pkgs; mkShell {
           buildInputs = [
             cargo
+            rls
             rustc
+            rustfmt
           ] ++ lib.optionals stdenv.isDarwin [ libiconv ];
         };
       });

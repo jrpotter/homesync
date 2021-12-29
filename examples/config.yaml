@@ -1,0 +1,9 @@
+remote:
+system:
+packages:
+  homesync:
+    configs:
+      - $XDG_CONFIG_HOME/homesync/homesync.yml
+      - $XDG_CONFIG_HOME/homesync.yml
+      - $HOME/.config/homesync/homesync.yml
+      - $HOME/.homesync.yml
