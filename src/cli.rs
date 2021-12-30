@@ -10,7 +10,7 @@ use std::io::Write;
 pub fn write_config(mut pending: PathConfig) -> config::Result<()> {
     println!(
         "Generating config at {}...\n",
-        Success.paint(pending.0.display().to_string())
+        Success.paint(pending.0.unresolved().display().to_string())
     );
 
     print!(
@@ -45,9 +45,9 @@ pub fn write_config(mut pending: PathConfig) -> config::Result<()> {
 pub fn list_packages(config: PathConfig) {
     println!(
         "Listing packages in {}...\n",
-        Success.paint(config.0.display().to_string())
+        Success.paint(config.0.unresolved().display().to_string())
     );
-    // TODO(jrpotter): Alphabetize the output list.
+    // Alphabetical ordered ensured by B-tree implementation.
     for (k, _) in config.1.packages {
         println!("• {}", k);
     }

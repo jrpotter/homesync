@@ -1,5 +1,5 @@
 use clap::{App, AppSettings, Arg};
-use homesync::path::{NormalPathBuf, Normalize};
+use homesync::path::ResPathBuf;
 use std::error::Error;
 use std::io;
 use std::path::PathBuf;
@@ -54,18 +54,18 @@ fn dispatch(matches: clap::ArgMatches) -> Result<(), Box<dyn Error>> {
     }
 }
 
-fn find_candidates(matches: &clap::ArgMatches) -> Result<Vec<NormalPathBuf>, Box<dyn Error>> {
+fn find_candidates(matches: &clap::ArgMatches) -> Result<Vec<ResPathBuf>, io::Error> {
     let candidates = match matches.value_of("config") {
         Some(config_match) => vec![PathBuf::from(config_match)],
         None => homesync::config::default_paths(),
     };
-    let mut normals = vec![];
+    let mut resolved = vec![];
     for candidate in candidates {
-        if let Ok(Normalize::Done(n)) = homesync::path::normalize(&candidate) {
-            normals.push(n);
+        if let Ok(Some(r)) = homesync::path::resolve(&candidate) {
+            resolved.push(r);
         }
     }
-    if normals.is_empty() {
+    if resolved.is_empty() {
         if let Some(config_match) = matches.value_of("config") {
             Err(io::Error::new(
                 io::ErrorKind::NotFound,
@@ -79,6 +79,6 @@ fn find_candidates(matches: &clap::ArgMatches) -> Result<Vec<NormalPathBuf>, Box
             ))?
         }
     } else {
-        Ok(normals)
+        Ok(resolved)
     }
 }

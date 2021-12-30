@@ -1,7 +1,6 @@
-use super::path;
-use super::path::{NormalPathBuf, Normalize};
+use super::path::ResPathBuf;
 use serde_derive::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::PathBuf;
 use std::{error, fmt, fs, io};
@@ -61,7 +60,7 @@ pub struct Package {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
     pub remote: Remote,
-    pub packages: HashMap<String, Package>,
+    pub packages: BTreeMap<String, Package>,
 }
 
 impl Config {
@@ -71,10 +70,10 @@ impl Config {
 }
 
 #[derive(Debug)]
-pub struct PathConfig(pub NormalPathBuf, pub Config);
+pub struct PathConfig(pub ResPathBuf, pub Config);
 
 impl PathConfig {
-    pub fn new(path: &NormalPathBuf, config: Option<Config>) -> Self {
+    pub fn new(path: &ResPathBuf, config: Option<Config>) -> Self {
         PathConfig(
             path.clone(),
             config.unwrap_or(Config {
@@ -82,7 +81,7 @@ impl PathConfig {
                     owner: "example-user".to_owned(),
                     name: "home-config".to_owned(),
                 },
-                packages: HashMap::new(),
+                packages: BTreeMap::new(),
             }),
         )
     }
@@ -111,7 +110,7 @@ pub fn default_paths() -> Vec<PathBuf> {
     DEFAULT_PATHS.iter().map(|s| PathBuf::from(s)).collect()
 }
 
-pub fn load(candidates: &Vec<NormalPathBuf>) -> Result<PathConfig> {
+pub fn load(candidates: &Vec<ResPathBuf>) -> Result<PathConfig> {
     // When trying our paths, the only acceptable error is a `NotFound` file.
     // Anything else should be surfaced to the end user.
     for candidate in candidates {
@@ -125,4 +124,10 @@ pub fn load(candidates: &Vec<NormalPathBuf>) -> Result<PathConfig> {
         }
     }
     Err(Error::MissingConfig)
+}
+
+pub fn reload(config: &PathConfig) -> Result<PathConfig> {
+    // TODO(jrpotter): Let's add a proper logging solution.
+    println!("Configuration reloaded.");
+    load(&vec![config.0.clone()])
 }

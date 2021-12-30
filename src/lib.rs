@@ -4,7 +4,7 @@ pub mod daemon;
 pub mod path;
 
 use config::PathConfig;
-use path::NormalPathBuf;
+use path::ResPathBuf;
 use std::error::Error;
 use std::io;
 
@@ -18,7 +18,7 @@ pub fn run_daemon(config: PathConfig) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn run_init(candidates: Vec<NormalPathBuf>) -> Result<(), config::Error> {
+pub fn run_init(candidates: Vec<ResPathBuf>) -> Result<(), config::Error> {
     debug_assert!(!candidates.is_empty(), "Empty candidates found in `init`.");
     if candidates.is_empty() {
         return Err(config::Error::FileError(io::Error::new(

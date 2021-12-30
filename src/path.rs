@@ -9,45 +9,67 @@ use std::path::{Component, Path, PathBuf};
 // Path
 // ========================================
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct NormalPathBuf(PathBuf);
+#[derive(Clone, Debug)]
+pub struct ResPathBuf {
+    inner: PathBuf,
+    unresolved: PathBuf,
+}
 
-impl NormalPathBuf {
+impl ResPathBuf {
     pub fn display(&self) -> std::path::Display {
-        self.0.display()
+        self.inner.display()
+    }
+
+    pub fn unresolved(&self) -> &PathBuf {
+        return &self.unresolved;
     }
 }
 
-impl AsRef<Path> for NormalPathBuf {
+impl PartialEq<ResPathBuf> for ResPathBuf {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner
+    }
+}
+
+impl PartialEq<PathBuf> for ResPathBuf {
+    fn eq(&self, other: &PathBuf) -> bool {
+        self.inner == *other
+    }
+}
+
+impl Eq for ResPathBuf {}
+
+impl From<ResPathBuf> for PathBuf {
+    fn from(path: ResPathBuf) -> PathBuf {
+        path.inner
+    }
+}
+
+impl AsRef<Path> for ResPathBuf {
     fn as_ref(&self) -> &Path {
-        &self.0
+        &self.inner
     }
 }
 
-impl AsRef<PathBuf> for NormalPathBuf {
+impl AsRef<PathBuf> for ResPathBuf {
     fn as_ref(&self) -> &PathBuf {
-        &self.0
+        &self.inner
     }
 }
 
-impl Hash for NormalPathBuf {
+impl Hash for ResPathBuf {
     fn hash<H: Hasher>(&self, h: &mut H) {
-        for component in self.0.components() {
+        for component in self.inner.components() {
             component.hash(h);
         }
     }
 }
 
-pub enum Normalize {
-    Done(NormalPathBuf), // An instance of a fully resolved path.
-    Pending,             // An instance of a path that cannot yet be normalized.
-}
-
-// Find environment variables found within the argument and expand them if
-// possible.
-//
-// Returns `None` in the case an environment variable present within the
-// argument is not defined.
+/// Find environment variables found within the argument and expand them if
+/// possible.
+///
+/// Returns `None` in the case an environment variable present within the
+/// argument is not defined.
 fn expand_env(s: &OsStr) -> Option<OsString> {
     let re = Regex::new(r"\$(?P<env>[[:alnum:]]+)").unwrap();
     let lossy = s.to_string_lossy();
@@ -59,17 +81,14 @@ fn expand_env(s: &OsStr) -> Option<OsString> {
     Some(path.into())
 }
 
-// Normalizes the provided path, returning a new instance.
-//
-// There currently does not exist a method that yields some canonical path for
-// files that do not exist (at least in the parts of the standard library I've
-// looked in). We create a consistent view of every path so as to avoid watching
-// the same path multiple times, which would duplicate messages on changes.
-//
-// Note this does not actually prevent the issue fully. We could have two paths
-// that refer to the same real path - normalization would not catch this.
-pub fn normalize(path: &Path) -> io::Result<Normalize> {
-    let mut pb = env::current_dir()?;
+/// Attempt to resolve the provided path, returning a fully resolved path
+/// instance.
+///
+/// If the provided file does not exist but could potentially exist in the
+/// future (e.g. for paths with environment variables defined), this will
+/// return a `None` instead of an error.
+pub fn resolve(path: &Path) -> io::Result<Option<ResPathBuf>> {
+    let mut expanded = env::current_dir()?;
     for comp in path.components() {
         match comp {
             Component::Prefix(_) => {
@@ -79,12 +98,12 @@ pub fn normalize(path: &Path) -> io::Result<Normalize> {
                 ))
             }
             Component::RootDir => {
-                pb.clear();
-                pb.push(Component::RootDir)
+                expanded.clear();
+                expanded.push(Component::RootDir)
             }
             Component::CurDir => (), // Make no changes.
             Component::ParentDir => {
-                if !pb.pop() {
+                if !expanded.pop() {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
                         "Cannot take parent of root.",
@@ -92,12 +111,19 @@ pub fn normalize(path: &Path) -> io::Result<Normalize> {
                 }
             }
             Component::Normal(c) => match expand_env(c) {
-                Some(c) => pb.push(Component::Normal(&c)),
+                Some(c) => expanded.push(Component::Normal(&c)),
                 // The environment variable isn't defined yet but might be in
                 // the future.
-                None => return Ok(Normalize::Pending),
+                None => return Ok(None),
             },
         }
     }
-    Ok(Normalize::Done(NormalPathBuf(pb)))
+    match expanded.canonicalize() {
+        Ok(resolved) => Ok(Some(ResPathBuf {
+            inner: resolved,
+            unresolved: path.to_path_buf(),
+        })),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(e),
+    }
 }
