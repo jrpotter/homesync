@@ -10,6 +10,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+ansi_term = "0.12.1"
 clap = { version = "3.0.0-rc.9", features = ["derive"] }
 notify = "4.0.16"
 serde = "1.0"
