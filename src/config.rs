@@ -54,7 +54,7 @@ pub struct Remote {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Package {
-    pub configs: Vec<String>,
+    pub configs: Vec<PathBuf>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

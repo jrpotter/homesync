@@ -11,7 +11,9 @@ pub fn run_add(_candidates: Vec<PathBuf>) -> Result<(), config::Error> {
     Ok(())
 }
 
-pub fn run_daemon(_candidates: Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
+pub fn run_daemon(candidates: Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
+    let loaded = config::load(&candidates)?;
+    daemon::launch(loaded)?;
     Ok(())
 }
 
