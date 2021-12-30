@@ -1,18 +1,26 @@
-mod homesync;
+pub mod config;
 
-use homesync::config;
 use std::error::Error;
+use std::path::PathBuf;
 
-pub fn run_configure(_matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn run_configure(
+    paths: Vec<PathBuf>,
+    _matches: &clap::ArgMatches,
+) -> Result<(), Box<dyn Error>> {
     // Check if we already have a local config somewhere. If so, reprompt the
     // same configuration options and override the values present in the current
     // YAML file.
-    let _config = match config::find_config() {
-        Ok(conf) => Ok(conf),
-        Err(config::Error::MissingConfig) => Ok(config::generate_config()),
-        Err(config::Error::WithFile(e)) => Err(e),
-    };
-    Ok(())
+    match config::read_config(&paths) {
+        Ok(_) => {
+            print!("successfully read\n");
+            Ok(())
+        }
+        Err(config::Error::MissingConfig) => {
+            print!("missing config\n");
+            Ok(())
+        }
+        Err(e) => Err(Box::new(e)),
+    }
 }
 
 pub fn run_push(_matches: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
