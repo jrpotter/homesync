@@ -1,7 +1,7 @@
 ---
 remote:
-  owner: test
-  name: woah
+  owner: jrpotter
+  name: home-config
 packages:
   homesync:
     configs:

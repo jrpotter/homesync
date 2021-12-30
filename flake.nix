@@ -15,9 +15,11 @@
           buildInputs = [
             cargo
             rls
+            libiconv
             rustc
             rustfmt
-          ] ++ lib.optionals stdenv.isDarwin [ libiconv ];
+          ] ++ lib.optionals stdenv.isDarwin (
+            with darwin.apple_sdk.frameworks; [ CoreServices ]);
         };
       });
 }

@@ -1,63 +1,50 @@
+pub mod cli;
 pub mod config;
+pub mod daemon;
 
-use ansi_term::Colour::Green;
-use config::Config;
+use config::PathConfig;
 use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-pub fn run_add(paths: Vec<PathBuf>) -> Result<(), config::Error> {
-    debug_assert!(!paths.is_empty(), "`run_init` paths empty");
-    if paths.is_empty() {
-        return Err(config::Error::MissingConfig);
-    }
+pub fn run_add(_candidates: Vec<PathBuf>) -> Result<(), config::Error> {
     // TODO(jrpotter): Show $EDITOR that allows writing specific package.
     Ok(())
 }
 
-pub fn run_init(paths: Vec<PathBuf>) -> Result<(), config::Error> {
-    // TODO(jrpotter): Use a nonempty implementation instead of this.
-    debug_assert!(!paths.is_empty(), "`run_init` paths empty");
-    if paths.is_empty() {
-        return Err(config::Error::MissingConfig);
-    }
-    // Check if we already have a local config somewhere. If so, reprompt the
-    // same configuration options and override the values present in the current
-    // YAML file.
-    match config::load(&paths) {
-        Ok((path, config)) => config::init(path, config),
-        // TODO(jrpotter): Verify I have permission to write at specified path.
-        // Make directories if necessary.
-        Err(config::Error::MissingConfig) => config::init(&paths[0], Config::default()),
-        Err(e) => Err(e),
-    }
+pub fn run_daemon(_candidates: Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
+    Ok(())
 }
 
-pub fn run_list(paths: Vec<PathBuf>) -> Result<(), config::Error> {
-    debug_assert!(!paths.is_empty(), "`run_init` paths empty");
-    if paths.is_empty() {
-        return Err(config::Error::MissingConfig);
-    }
-    match config::load(&paths) {
-        Ok((path, config)) => {
-            // TODO(jrpotter): Should sort these entries.
-            // Also clean up where I use the console writing or not.
-            println!(
-                "Listing packages at {}...\n",
-                Green.paint(path.display().to_string())
-            );
-            for (k, _) in config.packages {
-                println!("• {}", k);
-            }
-            Ok(())
+pub fn run_init(candidates: Vec<PathBuf>) -> Result<(), config::Error> {
+    match config::load(&candidates) {
+        // Check if we already have a local config somewhere. If so, reprompt
+        // the same configuration options and override the values present in the
+        // current YAML file.
+        Ok(pending) => cli::write_config(pending),
+        // Otherwise create a new config file at the given location. We always
+        // assume we want to write to the first file in our priority list. If
+        // not, the user should specify which config they want to write using
+        // the `-c` flag.
+        // TODO(jrpotter): Verify I have permission to write at specified path.
+        // Make directories if necessary.
+        Err(config::Error::MissingConfig) if !candidates.is_empty() => {
+            let pending = PathConfig::new(&candidates[0], None);
+            cli::write_config(pending)
         }
         Err(e) => Err(e),
     }
 }
 
-pub fn run_pull(_: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn run_list(candidates: Vec<PathBuf>) -> Result<(), config::Error> {
+    let loaded = config::load(&candidates)?;
+    cli::list_packages(loaded);
     Ok(())
 }
 
-pub fn run_push(_: &clap::ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn run_pull() -> Result<(), Box<dyn Error>> {
+    Ok(())
+}
+
+pub fn run_push() -> Result<(), Box<dyn Error>> {
     Ok(())
 }

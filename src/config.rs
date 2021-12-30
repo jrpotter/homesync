@@ -9,7 +9,7 @@ use std::{env, error, fmt, fs, io};
 // Error
 // ========================================
 
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
@@ -67,21 +67,29 @@ impl Config {
     pub fn new(contents: &str) -> Result<Self> {
         Ok(serde_yaml::from_str(&contents)?)
     }
+}
 
-    pub fn default() -> Self {
-        Config {
-            remote: Remote {
-                owner: "example-user".to_owned(),
-                name: "home-config".to_owned(),
-            },
-            packages: HashMap::new(),
-        }
+#[derive(Debug)]
+pub struct PathConfig(pub PathBuf, pub Config);
+
+impl PathConfig {
+    pub fn new(path: &Path, config: Option<Config>) -> Self {
+        PathConfig(
+            path.to_path_buf(),
+            config.unwrap_or(Config {
+                remote: Remote {
+                    owner: "example-user".to_owned(),
+                    name: "home-config".to_owned(),
+                },
+                packages: HashMap::new(),
+            }),
+        )
     }
 
-    pub fn save(&self, path: &Path) -> Result<()> {
+    pub fn write(&self) -> Result<()> {
         // TODO(jrpotter): Create backup file before overwriting.
-        let mut file = fs::File::create(path)?;
-        let serialized = serde_yaml::to_string(&self)?;
+        let mut file = fs::File::create(&self.0)?;
+        let serialized = serde_yaml::to_string(&self.1)?;
         file.write_all(serialized.as_bytes())?;
         Ok(())
     }
@@ -120,50 +128,18 @@ pub fn default_paths() -> Vec<PathBuf> {
     paths
 }
 
-pub fn load(paths: &Vec<PathBuf>) -> Result<(&Path, Config)> {
+pub fn load(candidates: &Vec<PathBuf>) -> Result<PathConfig> {
     // When trying our paths, the only acceptable error is a `NotFound` file.
     // Anything else should be surfaced to the end user.
-    for path in paths {
+    for path in candidates {
         match fs::read_to_string(path) {
             Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
             Err(err) => return Err(Error::FileError(err)),
-            Ok(contents) => return Ok((&path, Config::new(&contents)?)),
+            Ok(contents) => {
+                let config = Config::new(&contents)?;
+                return Ok(PathConfig::new(&path, Some(config)));
+            }
         }
     }
     Err(Error::MissingConfig)
-}
-
-// ========================================
-// Initialization
-// ========================================
-
-pub fn init(path: &Path, default: Config) -> Result<()> {
-    // TODO(jrpotter): Use curses to make this nicer.
-    println!(
-        "Generating config at {}...\n\n",
-        Green.paint(path.display().to_string())
-    );
-    print!(
-        "Git repository owner <{}> (enter to continue): ",
-        default.remote.owner
-    );
-    io::stdout().flush()?;
-    let mut owner = String::new();
-    io::stdin().read_line(&mut owner)?;
-    let owner = owner.trim().to_owned();
-
-    print!(
-        "Git repository name <{}> (enter to continue): ",
-        default.remote.name
-    );
-    io::stdout().flush()?;
-    let mut name = String::new();
-    io::stdin().read_line(&mut name)?;
-    let name = name.trim().to_owned();
-
-    Config {
-        remote: Remote { owner, name },
-        packages: default.packages,
-    }
-    .save(path)
 }
