@@ -1,9 +1,10 @@
-use ansi_term::Colour::Green;
+use super::path;
+use super::path::{NormalPathBuf, Normalize};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::{env, error, fmt, fs, io};
+use std::path::PathBuf;
+use std::{error, fmt, fs, io};
 
 // ========================================
 // Error
@@ -70,12 +71,12 @@ impl Config {
 }
 
 #[derive(Debug)]
-pub struct PathConfig(pub PathBuf, pub Config);
+pub struct PathConfig(pub NormalPathBuf, pub Config);
 
 impl PathConfig {
-    pub fn new(path: &Path, config: Option<Config>) -> Self {
+    pub fn new(path: &NormalPathBuf, config: Option<Config>) -> Self {
         PathConfig(
-            path.to_path_buf(),
+            path.clone(),
             config.unwrap_or(Config {
                 remote: Remote {
                     owner: "example-user".to_owned(),
@@ -86,8 +87,8 @@ impl PathConfig {
         )
     }
 
+    // TODO(jrpotter): Create backup file before overwriting.
     pub fn write(&self) -> Result<()> {
-        // TODO(jrpotter): Create backup file before overwriting.
         let mut file = fs::File::create(&self.0)?;
         let serialized = serde_yaml::to_string(&self.1)?;
         file.write_all(serialized.as_bytes())?;
@@ -99,45 +100,27 @@ impl PathConfig {
 // Loading
 // ========================================
 
-/// Returns the default configuration files `homesync` looks for.
-///
-/// - `$HOME/.homesync.yml`
-/// - `$HOME/.config/homesync/homesync.yml`
-/// - `$XDG_CONFIG_HOME/homesync.yml`
-/// - `$XDG_CONFIG_HOME/homesync/homesync.yml`
-///
-/// Returned `PathBuf`s are looked for in the above order.
+pub const DEFAULT_PATHS: &[&str] = &[
+    "$HOME/.homesync.yml",
+    "$HOME/.config/homesync/homesync.yml",
+    "$XDG_CONFIG_HOME/homesync.yml",
+    "$XDG_CONFIG_HOME/homesync/homesync.yml",
+];
+
 pub fn default_paths() -> Vec<PathBuf> {
-    let mut paths: Vec<PathBuf> = Vec::new();
-    if let Ok(home) = env::var("HOME") {
-        paths.extend_from_slice(&[
-            [&home, ".homesync.yml"].iter().collect(),
-            [&home, ".config", "homesync", "homesync.yml"]
-                .iter()
-                .collect(),
-        ]);
-    }
-    if let Ok(xdg_config_home) = env::var("XDG_CONFIG_HOME") {
-        paths.extend_from_slice(&[
-            [&xdg_config_home, "homesync.yml"].iter().collect(),
-            [&xdg_config_home, "homesync", "homesync.yml"]
-                .iter()
-                .collect(),
-        ]);
-    }
-    paths
+    DEFAULT_PATHS.iter().map(|s| PathBuf::from(s)).collect()
 }
 
-pub fn load(candidates: &Vec<PathBuf>) -> Result<PathConfig> {
+pub fn load(candidates: &Vec<NormalPathBuf>) -> Result<PathConfig> {
     // When trying our paths, the only acceptable error is a `NotFound` file.
     // Anything else should be surfaced to the end user.
-    for path in candidates {
-        match fs::read_to_string(path) {
+    for candidate in candidates {
+        match fs::read_to_string(candidate) {
             Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
             Err(err) => return Err(Error::FileError(err)),
             Ok(contents) => {
                 let config = Config::new(&contents)?;
-                return Ok(PathConfig::new(&path, Some(config)));
+                return Ok(PathConfig::new(candidate, Some(config)));
             }
         }
     }

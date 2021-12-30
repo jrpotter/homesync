@@ -1,19 +1,8 @@
 use clap::{App, AppSettings, Arg};
+use homesync::path::{NormalPathBuf, Normalize};
 use std::error::Error;
+use std::io;
 use std::path::PathBuf;
-
-fn dispatch(paths: Vec<PathBuf>, matches: clap::ArgMatches) -> Result<(), Box<dyn Error>> {
-    match matches.subcommand() {
-        Some(("add", _)) => homesync::run_add(paths)?,
-        Some(("daemon", _)) => homesync::run_daemon(paths)?,
-        Some(("init", _)) => homesync::run_init(paths)?,
-        Some(("list", _)) => homesync::run_list(paths)?,
-        Some(("pull", _)) => homesync::run_pull()?,
-        Some(("push", _)) => homesync::run_push()?,
-        _ => unreachable!(),
-    };
-    Ok(())
-}
 
 fn main() {
     let matches = App::new("homesync")
@@ -37,12 +26,59 @@ fn main() {
         .subcommand(App::new("push").about("Push local repository to remote repository"))
         .get_matches();
 
+    if let Err(e) = dispatch(matches) {
+        eprintln!("{}", e);
+    }
+}
+
+fn dispatch(matches: clap::ArgMatches) -> Result<(), Box<dyn Error>> {
+    let candidates = find_candidates(&matches)?;
+    match matches.subcommand() {
+        Some(("init", _)) => Ok(homesync::run_init(candidates)?),
+        // All subcommands beside `init` require a config. If we invoke any of
+        // these, immediately attempt to load our config. Note once a config is
+        // loaded, this same config is used throughout the lifetime of the
+        // process. We avoid introducing the ability to "change" which config is
+        // used, even if one of higher priority is eventually defined.
+        subcommand => {
+            let config = homesync::config::load(&candidates)?;
+            match subcommand {
+                Some(("add", _)) => Ok(homesync::run_add(config)?),
+                Some(("daemon", _)) => Ok(homesync::run_daemon(config)?),
+                Some(("list", _)) => Ok(homesync::run_list(config)?),
+                Some(("pull", _)) => Ok(homesync::run_pull(config)?),
+                Some(("push", _)) => Ok(homesync::run_push(config)?),
+                _ => unreachable!(),
+            }
+        }
+    }
+}
+
+fn find_candidates(matches: &clap::ArgMatches) -> Result<Vec<NormalPathBuf>, Box<dyn Error>> {
     let candidates = match matches.value_of("config") {
-        Some(path) => vec![PathBuf::from(path)],
+        Some(config_match) => vec![PathBuf::from(config_match)],
         None => homesync::config::default_paths(),
     };
-
-    if let Err(e) = dispatch(candidates, matches) {
-        eprintln!("{}", e);
+    let mut normals = vec![];
+    for candidate in candidates {
+        if let Ok(Normalize::Done(n)) = homesync::path::normalize(&candidate) {
+            normals.push(n);
+        }
+    }
+    if normals.is_empty() {
+        if let Some(config_match) = matches.value_of("config") {
+            Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("{} is not a valid config path.", config_match),
+            ))?
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "Could not find a suitable configuration path. Is \
+                $XDG_CONFIG_PATH or $HOME defined?",
+            ))?
+        }
+    } else {
+        Ok(normals)
     }
 }

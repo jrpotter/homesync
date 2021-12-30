@@ -1,23 +1,31 @@
 pub mod cli;
 pub mod config;
 pub mod daemon;
+pub mod path;
 
 use config::PathConfig;
+use path::NormalPathBuf;
 use std::error::Error;
-use std::path::PathBuf;
+use std::io;
 
-pub fn run_add(_candidates: Vec<PathBuf>) -> Result<(), config::Error> {
+pub fn run_add(_config: PathConfig) -> Result<(), config::Error> {
     // TODO(jrpotter): Show $EDITOR that allows writing specific package.
     Ok(())
 }
 
-pub fn run_daemon(candidates: Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
-    let loaded = config::load(&candidates)?;
-    daemon::launch(loaded)?;
+pub fn run_daemon(config: PathConfig) -> Result<(), Box<dyn Error>> {
+    daemon::launch(config)?;
     Ok(())
 }
 
-pub fn run_init(candidates: Vec<PathBuf>) -> Result<(), config::Error> {
+pub fn run_init(candidates: Vec<NormalPathBuf>) -> Result<(), config::Error> {
+    debug_assert!(!candidates.is_empty(), "Empty candidates found in `init`.");
+    if candidates.is_empty() {
+        return Err(config::Error::FileError(io::Error::new(
+            io::ErrorKind::NotFound,
+            "No suitable config file found.",
+        )));
+    }
     match config::load(&candidates) {
         // Check if we already have a local config somewhere. If so, reprompt
         // the same configuration options and override the values present in the
@@ -37,16 +45,15 @@ pub fn run_init(candidates: Vec<PathBuf>) -> Result<(), config::Error> {
     }
 }
 
-pub fn run_list(candidates: Vec<PathBuf>) -> Result<(), config::Error> {
-    let loaded = config::load(&candidates)?;
-    cli::list_packages(loaded);
+pub fn run_list(config: PathConfig) -> Result<(), config::Error> {
+    cli::list_packages(config);
     Ok(())
 }
 
-pub fn run_pull() -> Result<(), Box<dyn Error>> {
+pub fn run_pull(_config: PathConfig) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn run_push() -> Result<(), Box<dyn Error>> {
+pub fn run_push(_config: PathConfig) -> Result<(), Box<dyn Error>> {
     Ok(())
 }

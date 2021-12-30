@@ -1,6 +1,6 @@
 # homesync
 
-**Caution! This is unstable code!**
+**Caution! This is a work in progress and far from complete!**
 
 ## Introduction
 
@@ -31,7 +31,39 @@ configuration is according to package manager, platform, etc.
 
 ## Usage
 
-TODO
+Verify your installation by running `homesync` from the command line. If
+installed, you will likely want to initialize a new config instance. Do so by
+typing:
+
+```bash
+$ homesync init
+```
+
+You can then walk through what github repository you want to sync your various
+files with. You can have homesync automatically monitor all configuration files
+and post updates on changes by running
+
+```bash
+$ homesync daemon
+```
+
+As changes are made to your `homesync` config or any configuration files
+referred to within the `homesync` config, the daemon service will sync the
+changes to the local git repository. To push these changes upward, run
+
+```bash
+$ homesync push --all
+```
+
+which will expose a git interface for you to complete the push. Lastly, to sync
+the remote configurations to your local files, run
+
+```bash
+$ homesync pull --all
+```
+
+This will load up a diff wrapper for you to ensure you make the changes you'd
+like.
 
 ## Contribution
 
