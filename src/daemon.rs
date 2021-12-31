@@ -14,9 +14,6 @@ use std::time::Duration;
 // TODO(jrpotter): Add logging.
 // TODO(jrpotter): Add pid file to only allow one daemon at a time.
 
-// Used for both polling and debouncing file system events.
-const WATCH_FREQUENCY: Duration = Duration::from_secs(5);
-
 // ========================================
 // Polling
 // ========================================
@@ -49,7 +46,7 @@ fn resolve_pending(tx: &Sender<DebouncedEvent>, pending: &HashSet<PathBuf>) -> V
     to_remove
 }
 
-fn poll_pending(tx: Sender<DebouncedEvent>, rx: Receiver<PollEvent>) {
+fn poll_pending(tx: Sender<DebouncedEvent>, rx: Receiver<PollEvent>, freq_secs: u64) {
     let mut pending = HashSet::new();
     loop {
         match rx.try_recv() {
@@ -61,7 +58,7 @@ fn poll_pending(tx: Sender<DebouncedEvent>, rx: Receiver<PollEvent>) {
                 resolve_pending(&tx, &pending).iter().for_each(|r| {
                     pending.remove(r);
                 });
-                thread::sleep(WATCH_FREQUENCY);
+                thread::sleep(Duration::from_secs(freq_secs));
             }
             Err(TryRecvError::Disconnected) => panic!("Polling channel closed."),
         }
@@ -142,7 +139,7 @@ impl<'a> WatchState<'a> {
 // Daemon
 // ========================================
 
-pub fn launch(mut config: PathConfig) -> Result<(), Box<dyn Error>> {
+pub fn launch(mut config: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Error>> {
     let (poll_tx, poll_rx) = channel();
     let (watch_tx, watch_rx) = channel();
     let watch_tx1 = watch_tx.clone();
@@ -150,12 +147,12 @@ pub fn launch(mut config: PathConfig) -> Result<(), Box<dyn Error>> {
     // watch, but this fails if no file exists at the given path. In these
     // cases, we rely on a basic polling strategy to check if the files ever
     // come into existence.
-    thread::spawn(move || poll_pending(watch_tx, poll_rx));
+    thread::spawn(move || poll_pending(watch_tx, poll_rx, freq_secs));
     // Track our original config file separately from the other files that may
     // be defined in the config. We want to make sure we're always alerted on
     // changes to it for hot reloading purposes, and not worry that our wrapper
     // will ever clear it from its watch state.
-    let mut watcher: RecommendedWatcher = Watcher::new(watch_tx1, WATCH_FREQUENCY)?;
+    let mut watcher: RecommendedWatcher = Watcher::new(watch_tx1, Duration::from_secs(freq_secs))?;
     watcher.watch(&config.0, RecursiveMode::NonRecursive)?;
     let mut state = WatchState::new(poll_tx, &mut watcher)?;
     state.update(&config);

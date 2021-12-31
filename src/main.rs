@@ -19,7 +19,25 @@ fn main() {
                 .takes_value(true),
         )
         .subcommand(App::new("add").about("Add new configuration to local repository"))
-        .subcommand(App::new("daemon").about("Start up a new homesync daemon"))
+        .subcommand(
+            App::new("daemon")
+                .about("Start up a new homesync daemon")
+                .arg(
+                    Arg::new("frequency")
+                        .short('f')
+                        .long("frequency")
+                        .value_name("FREQUENCY")
+                        .help("How often (in seconds) we poll/debounce file system changes")
+                        .long_help(
+                            "There exists a balance between how responsive changes are \
+                    made and how expensive it is to look for changes. \
+                    Empirically we found the default value to offer a nice \
+                    compromise but this can be tweaked based on preference.",
+                        )
+                        .takes_value(true)
+                        .default_value("5"),
+                ),
+        )
         .subcommand(App::new("init").about("Initialize the homesync local repository"))
         .subcommand(App::new("list").about("See which packages homesync manages"))
         .subcommand(App::new("pull").about("Pull remote repository into local repository"))
@@ -44,7 +62,18 @@ fn dispatch(matches: clap::ArgMatches) -> Result<(), Box<dyn Error>> {
             let config = homesync::config::load(&candidates)?;
             match subcommand {
                 Some(("add", _)) => Ok(homesync::run_add(config)?),
-                Some(("daemon", _)) => Ok(homesync::run_daemon(config)?),
+                Some(("daemon", matches)) => {
+                    let freq_secs: u64 = match matches.value_of("frequency") {
+                        Some(f) => f.parse().unwrap_or(0),
+                        None => 5,
+                    };
+                    if freq_secs > 0 {
+                        homesync::run_daemon(config, freq_secs)?;
+                    } else {
+                        eprintln!("Invalid frequency. Expected a positive integer.");
+                    }
+                    Ok(())
+                }
                 Some(("list", _)) => Ok(homesync::run_list(config)?),
                 Some(("pull", _)) => Ok(homesync::run_pull(config)?),
                 Some(("push", _)) => Ok(homesync::run_push(config)?),

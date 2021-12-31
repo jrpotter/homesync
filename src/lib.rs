@@ -13,8 +13,8 @@ pub fn run_add(_config: PathConfig) -> Result<(), config::Error> {
     Ok(())
 }
 
-pub fn run_daemon(config: PathConfig) -> Result<(), Box<dyn Error>> {
-    daemon::launch(config)?;
+pub fn run_daemon(config: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Error>> {
+    daemon::launch(config, freq_secs)?;
     Ok(())
 }
 
