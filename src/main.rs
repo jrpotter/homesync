@@ -30,9 +30,9 @@ fn main() {
                         .help("How often (in seconds) we poll/debounce file system changes")
                         .long_help(
                             "There exists a balance between how responsive changes are \
-                    made and how expensive it is to look for changes. \
-                    Empirically we found the default value to offer a nice \
-                    compromise but this can be tweaked based on preference.",
+                    made and how expensive it is to look for changes. Empirically we found the \
+                    default value to offer a nice compromise but this can be tweaked based on \
+                    preference.",
                         )
                         .takes_value(true)
                         .default_value("5"),

@@ -8,6 +8,6 @@ filesToFormat=$(
 
 for path in $filesToFormat
 do
-  rustfmt $path
+  rustfmt --edition 2021 $path
   git add $path
 done;
