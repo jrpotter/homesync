@@ -1,6 +1,4 @@
 use super::config::PathConfig;
-use git2::Repository;
-use octocrab;
 
 /// Sets up a local github repository all configuration files will be synced to.
 /// We attempt to clone the remote repository in favor of building our own.
@@ -13,6 +11,6 @@ use octocrab;
 ///
 /// NOTE! This does not perform any syncing between local and remote. That
 /// should be done as a specific command line request.
-pub async fn init(config: &PathConfig) {
+pub async fn init(_config: &PathConfig) {
     // TODO(jrpotter): Fill this out.
 }

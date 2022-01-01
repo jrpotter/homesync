@@ -26,7 +26,7 @@ enum PollEvent {
 fn resolve_pending(tx: &Sender<DebouncedEvent>, pending: &HashSet<PathBuf>) -> Vec<PathBuf> {
     let mut to_remove = vec![];
     for path in pending {
-        match path::resolve(&path) {
+        match path::soft_resolve(&path) {
             Ok(Some(resolved)) => {
                 to_remove.push(path.clone());
                 tx.send(DebouncedEvent::Create(resolved.into()))
@@ -125,7 +125,7 @@ impl<'a> WatchState<'a> {
         self.watching.clear();
         for (_, package) in &config.1.packages {
             for path in &package.configs {
-                match path::resolve(&path) {
+                match path::soft_resolve(&path) {
                     Ok(None) => self.send_poll(PollEvent::Pending(path.clone())),
                     Ok(Some(n)) => self.watch(n),
                     Err(_) => (),

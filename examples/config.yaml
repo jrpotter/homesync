@@ -1,7 +1,5 @@
 ---
-remote:
-  owner: jrpotter
-  name: home-config
+remote: https://github.com/jrpotter/home-config.git
 packages:
   homesync:
     configs:

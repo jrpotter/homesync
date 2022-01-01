@@ -90,7 +90,7 @@ fn find_candidates(matches: &clap::ArgMatches) -> Result<Vec<ResPathBuf>, io::Er
     };
     let mut resolved = vec![];
     for candidate in candidates {
-        if let Ok(Some(r)) = homesync::path::resolve(&candidate) {
+        if let Ok(Some(r)) = homesync::path::soft_resolve(&candidate) {
             resolved.push(r);
         }
     }

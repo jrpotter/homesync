@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::PathBuf;
 use std::{error, fmt, fs, io};
+use url::Url;
 
 // ========================================
 // Error
@@ -47,19 +48,14 @@ impl error::Error for Error {}
 // ========================================
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Remote {
-    pub owner: String,
-    pub name: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 pub struct Package {
     pub configs: Vec<PathBuf>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
-    pub remote: Remote,
+    pub local: Option<ResPathBuf>,
+    pub remote: Url,
     pub packages: BTreeMap<String, Package>,
 }
 
@@ -77,10 +73,8 @@ impl PathConfig {
         PathConfig(
             path.clone(),
             config.unwrap_or(Config {
-                remote: Remote {
-                    owner: "example-user".to_owned(),
-                    name: "home-config".to_owned(),
-                },
+                local: None,
+                remote: Url::parse("http://github.com/user/repo.git").unwrap(),
                 packages: BTreeMap::new(),
             }),
         )

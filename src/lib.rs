@@ -19,19 +19,22 @@ pub fn run_daemon(config: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Erro
     Ok(())
 }
 
-pub fn run_init(candidates: Vec<ResPathBuf>) -> Result<(), config::Error> {
+pub fn run_init(candidates: Vec<ResPathBuf>) -> Result<(), Box<dyn Error>> {
     debug_assert!(!candidates.is_empty(), "Empty candidates found in `init`.");
     if candidates.is_empty() {
-        return Err(config::Error::FileError(io::Error::new(
+        Err(config::Error::FileError(io::Error::new(
             io::ErrorKind::NotFound,
             "No suitable config file found.",
-        )));
+        )))?;
     }
     match config::load(&candidates) {
         // Check if we already have a local config somewhere. If so, reprompt
         // the same configuration options and override the values present in the
         // current YAML file.
-        Ok(pending) => cli::write_config(pending),
+        Ok(pending) => {
+            cli::write_config(pending)?;
+            Ok(())
+        }
         // Otherwise create a new config file at the given location. We always
         // assume we want to write to the first file in our priority list. If
         // not, the user should specify which config they want to write using
@@ -40,9 +43,10 @@ pub fn run_init(candidates: Vec<ResPathBuf>) -> Result<(), config::Error> {
         // Make directories if necessary.
         Err(config::Error::MissingConfig) if !candidates.is_empty() => {
             let pending = PathConfig::new(&candidates[0], None);
-            cli::write_config(pending)
+            cli::write_config(pending)?;
+            Ok(())
         }
-        Err(e) => Err(e),
+        Err(e) => Err(e)?,
     }
 }
 
