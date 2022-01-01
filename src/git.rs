@@ -53,33 +53,9 @@ impl error::Error for Error {}
 // Validation
 // ========================================
 
-fn validate_is_file(path: &Path) -> Result<()> {
-    let metadata = fs::metadata(path)?;
-    if !metadata.is_file() {
-        // TODO(jrpotter): Use `IsADirectory` when stable.
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("'{}' is not a file.", path.display()),
-        ))?;
-    }
-    Ok(())
-}
-
-fn validate_is_dir(path: &Path) -> Result<()> {
-    let metadata = fs::metadata(path)?;
-    if !metadata.is_dir() {
-        // TODO(jrpotter): Use `NotADirectory` when stable.
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("'{}' is not a directory.", path.display()),
-        ))?;
-    }
-    Ok(())
-}
-
 pub fn validate_local(path: &Path) -> Result<()> {
     let resolved = path::resolve(path)?;
-    validate_is_dir(resolved.as_ref())?;
+    path::validate_is_dir(resolved.as_ref())?;
 
     let mut local: PathBuf = resolved.into();
     local.push(".git");
@@ -92,7 +68,7 @@ pub fn validate_local(path: &Path) -> Result<()> {
             ),
         )
     })?;
-    validate_is_dir(local.as_ref())?;
+    path::validate_is_dir(local.as_ref())?;
 
     local.pop();
     local.push(".homesync");
@@ -105,7 +81,7 @@ pub fn validate_local(path: &Path) -> Result<()> {
             ),
         )
     })?;
-    validate_is_file(local.as_ref())?;
+    path::validate_is_file(local.as_ref())?;
 
     // TODO(jrpotter): Verify git repository is pointing to remote.
 

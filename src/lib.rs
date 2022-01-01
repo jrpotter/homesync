@@ -1,4 +1,3 @@
-pub mod cli;
 pub mod config;
 pub mod daemon;
 pub mod git;
@@ -22,7 +21,7 @@ pub fn run_daemon(config: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Erro
 pub fn run_init(candidates: Vec<ResPathBuf>) -> Result<(), Box<dyn Error>> {
     debug_assert!(!candidates.is_empty(), "Empty candidates found in `init`.");
     if candidates.is_empty() {
-        Err(config::Error::FileError(io::Error::new(
+        Err(config::Error::IOError(io::Error::new(
             io::ErrorKind::NotFound,
             "No suitable config file found.",
         )))?;
@@ -31,8 +30,8 @@ pub fn run_init(candidates: Vec<ResPathBuf>) -> Result<(), Box<dyn Error>> {
         // Check if we already have a local config somewhere. If so, reprompt
         // the same configuration options and override the values present in the
         // current YAML file.
-        Ok(pending) => {
-            cli::write_config(pending)?;
+        Ok(loaded) => {
+            config::write(&loaded.0, Some(loaded.1))?;
             Ok(())
         }
         // Otherwise create a new config file at the given location. We always
@@ -42,8 +41,7 @@ pub fn run_init(candidates: Vec<ResPathBuf>) -> Result<(), Box<dyn Error>> {
         // TODO(jrpotter): Verify I have permission to write at specified path.
         // Make directories if necessary.
         Err(config::Error::MissingConfig) if !candidates.is_empty() => {
-            let pending = PathConfig::new(&candidates[0], None);
-            cli::write_config(pending)?;
+            config::write(&candidates[0], None)?;
             Ok(())
         }
         Err(e) => Err(e)?,
@@ -51,7 +49,7 @@ pub fn run_init(candidates: Vec<ResPathBuf>) -> Result<(), Box<dyn Error>> {
 }
 
 pub fn run_list(config: PathConfig) -> Result<(), config::Error> {
-    cli::list_packages(config);
+    config::list_packages(config);
     Ok(())
 }
 

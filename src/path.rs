@@ -6,7 +6,7 @@ use std::env::VarError;
 use std::ffi::OsString;
 use std::hash::{Hash, Hasher};
 use std::path::{Component, Path, PathBuf};
-use std::{env, error, fmt, io, result, str};
+use std::{env, error, fmt, fs, io, result, str};
 
 // ========================================
 // Error
@@ -169,6 +169,34 @@ impl<'de> Deserialize<'de> for ResPathBuf {
     {
         deserializer.deserialize_string(ResPathBufVisitor)
     }
+}
+
+// ========================================
+// Validation
+// ========================================
+
+pub fn validate_is_file(path: &Path) -> Result<()> {
+    let metadata = fs::metadata(path)?;
+    if !metadata.is_file() {
+        // TODO(jrpotter): Use `IsADirectory` when stable.
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("'{}' is not a file.", path.display()),
+        ))?;
+    }
+    Ok(())
+}
+
+pub fn validate_is_dir(path: &Path) -> Result<()> {
+    let metadata = fs::metadata(path)?;
+    if !metadata.is_dir() {
+        // TODO(jrpotter): Use `NotADirectory` when stable.
+        Err(io::Error::new(
+            io::ErrorKind::Other,
+            format!("'{}' is not a directory.", path.display()),
+        ))?;
+    }
+    Ok(())
 }
 
 // ========================================

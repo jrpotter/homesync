@@ -60,9 +60,6 @@ fn dispatch(matches: clap::ArgMatches) -> Result<(), Box<dyn Error>> {
         // used, even if one of higher priority is eventually defined.
         subcommand => {
             let config = homesync::config::load(&candidates)?;
-            if let Some(local) = &config.1.local {
-                homesync::git::validate_local(local.as_ref())?;
-            }
             match subcommand {
                 Some(("add", _)) => Ok(homesync::run_add(config)?),
                 Some(("daemon", matches)) => {

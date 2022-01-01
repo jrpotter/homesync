@@ -1,5 +1,6 @@
 ---
-remote: https://github.com/jrpotter/home-config.git
+local: ""
+remote: "https://github.com/jrpotter/home-config.git"
 packages:
   homesync:
     configs:
