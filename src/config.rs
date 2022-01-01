@@ -1,12 +1,13 @@
-use super::path;
-use super::path::ResPathBuf;
+use super::{path, path::ResPathBuf};
 use ansi_term::Colour::{Green, Yellow};
 use serde_derive::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::env::VarError;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::{error, fmt, fs, io};
+use std::{
+    collections::BTreeMap,
+    env::VarError,
+    error, fmt, fs, io,
+    io::Write,
+    path::{Path, PathBuf},
+};
 use url::{ParseError, Url};
 
 // ========================================
@@ -210,7 +211,6 @@ pub fn write(path: &ResPathBuf, loaded: Option<Config>) -> Result<PathConfig> {
         },
     );
     generated.write()?;
-    println!("\nFinished writing configuration file.");
     Ok(generated)
 }
 

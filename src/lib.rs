@@ -5,8 +5,7 @@ pub mod path;
 
 use config::PathConfig;
 use path::ResPathBuf;
-use std::error::Error;
-use std::io;
+use std::{error::Error, io};
 
 pub fn run_add(_config: PathConfig) -> Result<(), config::Error> {
     // TODO(jrpotter): Show $EDITOR that allows writing specific package.
@@ -26,14 +25,11 @@ pub fn run_init(candidates: Vec<ResPathBuf>) -> Result<(), Box<dyn Error>> {
             "No suitable config file found.",
         )))?;
     }
-    match config::load(&candidates) {
+    let config = match config::load(&candidates) {
         // Check if we already have a local config somewhere. If so, reprompt
         // the same configuration options and override the values present in the
         // current YAML file.
-        Ok(loaded) => {
-            config::write(&loaded.0, Some(loaded.1))?;
-            Ok(())
-        }
+        Ok(loaded) => config::write(&loaded.0, Some(loaded.1))?,
         // Otherwise create a new config file at the given location. We always
         // assume we want to write to the first file in our priority list. If
         // not, the user should specify which config they want to write using
@@ -41,11 +37,16 @@ pub fn run_init(candidates: Vec<ResPathBuf>) -> Result<(), Box<dyn Error>> {
         // TODO(jrpotter): Verify I have permission to write at specified path.
         // Make directories if necessary.
         Err(config::Error::MissingConfig) if !candidates.is_empty() => {
-            config::write(&candidates[0], None)?;
-            Ok(())
+            config::write(&candidates[0], None)?
         }
         Err(e) => Err(e)?,
-    }
+    };
+    // Verify (or create) our local and remote git repositories. The internal
+    // git library we chose to use employs async/await so let's wrap around a
+    // channel.
+    git::init(&config)?;
+    println!("Finished initialization.");
+    Ok(())
 }
 
 pub fn run_list(config: PathConfig) -> Result<(), config::Error> {

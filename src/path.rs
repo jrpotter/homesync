@@ -1,12 +1,20 @@
 use regex::Regex;
-use serde::de;
-use serde::de::{Unexpected, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::env::VarError;
-use std::ffi::OsString;
-use std::hash::{Hash, Hasher};
-use std::path::{Component, Path, PathBuf};
-use std::{env, error, fmt, fs, io, result, str};
+use serde::{
+    de,
+    de::{Unexpected, Visitor},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
+use std::{
+    env,
+    env::VarError,
+    error,
+    ffi::OsString,
+    fmt, fs,
+    hash::{Hash, Hasher},
+    io,
+    path::{Component, Path, PathBuf},
+    result, str,
+};
 
 // ========================================
 // Error

@@ -1,9 +1,6 @@
-use super::config::PathConfig;
-use super::path;
-use super::path::ResPathBuf;
-use std::env::VarError;
-use std::path::{Path, PathBuf};
-use std::{error, fmt, fs, io, result};
+use super::{config::PathConfig, path};
+use git2::Repository;
+use std::{env::VarError, error, fmt, fs, io, path::PathBuf, result};
 
 // ========================================
 // Error
@@ -13,8 +10,16 @@ pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    GitError(git2::Error),
     IOError(io::Error),
+    NotHomesyncRepo,
     VarError(VarError),
+}
+
+impl From<git2::Error> for Error {
+    fn from(err: git2::Error) -> Error {
+        Error::GitError(err)
+    }
 }
 
 impl From<io::Error> for Error {
@@ -41,7 +46,12 @@ impl From<path::Error> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Error::GitError(e) => write!(f, "{}", e),
             Error::IOError(e) => write!(f, "{}", e),
+            Error::NotHomesyncRepo => write!(
+                f,
+                "Local repository is not managed by `homesync`. Missing `.homesync` sentinel file."
+            ),
             Error::VarError(e) => write!(f, "{}", e),
         }
     }
@@ -50,90 +60,93 @@ impl fmt::Display for Error {
 impl error::Error for Error {}
 
 // ========================================
-// Validation
-// ========================================
-
-pub fn validate_local(path: &Path) -> Result<()> {
-    let resolved = path::resolve(path)?;
-    path::validate_is_dir(resolved.as_ref())?;
-
-    let mut local: PathBuf = resolved.into();
-    local.push(".git");
-    path::resolve(&local).map_err(|_| {
-        io::Error::new(
-            io::ErrorKind::NotFound,
-            format!(
-                "Local directory '{}' is not a git repository.",
-                path.display()
-            ),
-        )
-    })?;
-    path::validate_is_dir(local.as_ref())?;
-
-    local.pop();
-    local.push(".homesync");
-    path::resolve(&local).map_err(|_| {
-        io::Error::new(
-            io::ErrorKind::NotFound,
-            format!(
-                "Sentinel file '.homesync' missing from local repository '{}'.",
-                path.display()
-            ),
-        )
-    })?;
-    path::validate_is_file(local.as_ref())?;
-
-    // TODO(jrpotter): Verify git repository is pointing to remote.
-
-    Ok(())
-}
-
-// ========================================
-// Repository
-// ========================================
-
-fn _setup_repo(path: &Path) -> Result<()> {
-    match path.parent() {
-        Some(p) => fs::create_dir_all(p)?,
-        None => (),
-    };
-    let mut repo_dir = path.to_path_buf();
-    repo_dir.push(".homesync");
-    match path::soft_resolve(&repo_dir) {
-        // The path already exists. Verify we are working with a git respository
-        // with sentinel value.
-        Ok(Some(resolved)) => {
-            validate_local(resolved.as_ref())?;
-        }
-        // Path does not exist yet. If a remote path exists, we should clone it.
-        // Otherwise boot up a local repsoitory.
-        Ok(None) => {}
-        Err(e) => Err(e)?,
-    }
-    Ok(())
-}
-
-// ========================================
 // Initialization
 // ========================================
 
+// All git error codes.
+// TODO(jrpotter): Remove these once done needing to reference them.
+// git2::ErrorCode::GenericError => panic!("generic"),
+// git2::ErrorCode::NotFound => panic!("not_found"),
+// git2::ErrorCode::Exists => panic!("exists"),
+// git2::ErrorCode::Ambiguous => panic!("ambiguous"),
+// git2::ErrorCode::BufSize => panic!("buf_size"),
+// git2::ErrorCode::User => panic!("user"),
+// git2::ErrorCode::BareRepo => panic!("bare_repo"),
+// git2::ErrorCode::UnbornBranch => panic!("unborn_branch"),
+// git2::ErrorCode::Unmerged => panic!("unmerged"),
+// git2::ErrorCode::NotFastForward => panic!("not_fast_forward"),
+// git2::ErrorCode::InvalidSpec => panic!("invalid_spec"),
+// git2::ErrorCode::Conflict => panic!("conflict"),
+// git2::ErrorCode::Locked => panic!("locked"),
+// git2::ErrorCode::Modified => panic!("modified"),
+// git2::ErrorCode::Auth => panic!("auth"),
+// git2::ErrorCode::Certificate => panic!("certificate"),
+// git2::ErrorCode::Applied => panic!("applied"),
+// git2::ErrorCode::Peel => panic!("peel"),
+// git2::ErrorCode::Eof => panic!("eof"),
+// git2::ErrorCode::Invalid => panic!("invalid"),
+// git2::ErrorCode::Uncommitted => panic!("uncommitted"),
+// git2::ErrorCode::Directory => panic!("directory"),
+// git2::ErrorCode::MergeConflict => panic!("merge_conflict"),
+// git2::ErrorCode::HashsumMismatch => panic!("hashsum_mismatch"),
+// git2::ErrorCode::IndexDirty => panic!("index_dirty"),
+// git2::ErrorCode::ApplyFail => panic!("apply_fail"),
+
 /// Sets up a local github repository all configuration files will be synced to.
-/// We attempt to clone the remote repository in favor of building our own.
+/// If there does not exist a local repository at the requested location, we
+/// attempt to make it.
 ///
-/// If a remote repository exists, we verify its managed by homesync (based on
-/// the presence of a sentinel file `.homesync`). Otherwise we raise an error.
-///
-/// If there is no local repository but a remote is available, we clone it.
-/// Otherwise we create a new, empty repository.
-///
-/// NOTE! This does not perform any syncing between local and remote. That
-/// should be done as a specific command line request.
-pub fn init(_path: &Path, _config: &PathConfig) -> Result<ResPathBuf> {
-    // let repository = match Repository::clone(url, "/path/to/a/repo") {
-    //     Ok(repo) => repo,
-    //     Err(e) => panic!("failed to clone: {}", e),
-    // };
-    // Hard resolution should succeed now that the above directory was created.
-    // Ok(path::resolve(&expanded)?);
-    panic!("")
+/// NOTE! This does not perform any syncing between local and remote. In fact,
+/// this method does not perform any validation on the remote.
+pub fn init(config: &PathConfig) -> Result<git2::Repository> {
+    // Permit the use of environment variables within the local configuration
+    // path (e.g. `$HOME`). Unlike with resolution, we want to fail if the
+    // environment variable is not defined.
+    let expanded = match config.1.local.to_str() {
+        Some(s) => s,
+        None => Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Could not local path to a UTF-8 encoded string.",
+        ))?,
+    };
+    let expanded = path::expand_env(expanded)?;
+    // Attempt to open the local path as a git repository if possible. The
+    // `NotFound` error is thrown if:
+    //
+    // - the directory does not exist.
+    // - the directory is not git-initialized (i.e. has a valid `.git`
+    //   subfolder).
+    // - the directory does not have appropriate permissions.
+    let local = match Repository::open(&expanded) {
+        Ok(repo) => Some(repo),
+        Err(e) => match e.code() {
+            git2::ErrorCode::NotFound => None,
+            _ => Err(e)?,
+        },
+    };
+    // Setup a sentinel file in the given repository. This is used for both
+    // ensuring any remote repositories are already managed by homesync and for
+    // storing any persisted configurations.
+    let mut sentinel = PathBuf::from(&expanded);
+    sentinel.push(".homesync");
+    match local {
+        Some(repo) => {
+            // Verify the given repository has a homesync sentinel file.
+            match path::validate_is_file(&sentinel) {
+                Ok(_) => (),
+                Err(_) => Err(Error::NotHomesyncRepo)?,
+            };
+            Ok(repo)
+        }
+        // If no local repository exists, we choose to just always initialize a
+        // new one instead of cloning from remote. Cloning has a separate set of
+        // issues that we need to resolve anyways (e.g. setting remote, pulling,
+        // managing possible merge conflicts, etc.).
+        None => {
+            println!("Creating new homesync repository.");
+            let repo = Repository::init(&expanded)?;
+            fs::File::create(sentinel)?;
+            Ok(repo)
+        }
+    }
 }

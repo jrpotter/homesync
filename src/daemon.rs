@@ -1,15 +1,13 @@
-use super::config;
-use super::config::PathConfig;
-use super::path;
-use super::path::ResPathBuf;
+use super::{config, config::PathConfig, path, path::ResPathBuf};
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
-use std::collections::HashSet;
-use std::error::Error;
-use std::path::PathBuf;
-use std::sync::mpsc::channel;
-use std::sync::mpsc::{Receiver, Sender, TryRecvError};
-use std::thread;
-use std::time::Duration;
+use std::{
+    collections::HashSet,
+    error::Error,
+    path::PathBuf,
+    sync::mpsc::{channel, Receiver, Sender, TryRecvError},
+    thread,
+    time::Duration,
+};
 
 // TODO(jrpotter): Add logging.
 // TODO(jrpotter): Add pid file to only allow one daemon at a time.

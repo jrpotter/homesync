@@ -1,5 +1,5 @@
 ---
-local: ""
+local: $HOME/.homesync
 remote: "https://github.com/jrpotter/home-config.git"
 packages:
   homesync:

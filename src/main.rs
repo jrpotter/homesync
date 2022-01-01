@@ -1,8 +1,6 @@
 use clap::{App, AppSettings, Arg};
 use homesync::path::ResPathBuf;
-use std::error::Error;
-use std::io;
-use std::path::PathBuf;
+use std::{error::Error, io, path::PathBuf};
 
 fn main() {
     let matches = App::new("homesync")
