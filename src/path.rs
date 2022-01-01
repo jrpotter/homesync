@@ -3,14 +3,10 @@ use serde::de;
 use serde::de::{Unexpected, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::env::VarError;
-use std::error;
 use std::ffi::OsString;
-use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::path::{Component, Path, PathBuf};
-use std::result;
-use std::str;
-use std::{env, io};
+use std::{env, error, fmt, io, result, str};
 
 // ========================================
 // Error
@@ -87,14 +83,14 @@ impl From<ResPathBuf> for PathBuf {
     }
 }
 
-impl AsRef<Path> for ResPathBuf {
-    fn as_ref(&self) -> &Path {
+impl AsRef<PathBuf> for ResPathBuf {
+    fn as_ref(&self) -> &PathBuf {
         &self.inner
     }
 }
 
-impl AsRef<PathBuf> for ResPathBuf {
-    fn as_ref(&self) -> &PathBuf {
+impl AsRef<Path> for ResPathBuf {
+    fn as_ref(&self) -> &Path {
         &self.inner
     }
 }

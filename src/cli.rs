@@ -1,12 +1,13 @@
 use super::config::PathConfig;
-use super::path::ResPathBuf;
-use super::{config, path};
+use super::{config, git, path};
 use ansi_term::Colour::{Green, Yellow};
 use std::env::VarError;
 use std::io::Write;
 use std::path::PathBuf;
-use std::{error, fmt, fs, io};
+use std::{error, fmt, io};
 use url::{ParseError, Url};
+
+// TODO(jrpotter): Use curses to make this module behave nicer.
 
 // ========================================
 // Error
@@ -25,6 +26,15 @@ pub enum Error {
 impl From<config::Error> for Error {
     fn from(err: config::Error) -> Error {
         Error::ConfigError(err)
+    }
+}
+
+impl From<git::Error> for Error {
+    fn from(err: git::Error) -> Error {
+        match err {
+            git::Error::IOError(e) => Error::IOError(e),
+            git::Error::VarError(e) => Error::VarError(e),
+        }
     }
 }
 
@@ -72,9 +82,7 @@ impl error::Error for Error {}
 // Prompts
 // ========================================
 
-// TODO(jrpotter): Use curses to make this module behave nicer.
-
-fn prompt_local(config: &PathConfig) -> Result<ResPathBuf> {
+fn prompt_local(config: &PathConfig) -> Result<PathBuf> {
     print!(
         "Local git repository <{}> (enter to continue): ",
         Yellow.paint(
@@ -86,16 +94,9 @@ fn prompt_local(config: &PathConfig) -> Result<ResPathBuf> {
         )
     );
     io::stdout().flush()?;
-
     let mut local = String::new();
     io::stdin().read_line(&mut local)?;
-    let expanded = PathBuf::from(path::expand_env(&local.trim())?);
-    // We need to generate the directory beforehand to verify the path is
-    // actually valid. Worst case this leaves empty directories scattered in
-    // various locations after repeated initialization.
-    fs::create_dir_all(&expanded)?;
-    // Hard resolution should succeed now that the above directory was created.
-    Ok(path::resolve(&expanded)?)
+    Ok(PathBuf::from(path::expand_env(&local.trim())?))
 }
 
 fn prompt_remote(config: &PathConfig) -> Result<Url> {
@@ -118,8 +119,12 @@ pub fn write_config(mut pending: PathConfig) -> Result<()> {
         "Generating config at {}...\n",
         Green.paint(pending.0.unresolved().display().to_string())
     );
-    pending.1.local = Some(prompt_local(&pending)?);
-    pending.1.remote = prompt_remote(&pending)?;
+    let local = prompt_local(&pending)?;
+    let remote = prompt_remote(&pending)?;
+    // Try to initialize the local respository if we can.
+    let resolved = git::init(&local, &pending)?;
+    pending.1.local = Some(resolved);
+    pending.1.remote = remote;
     pending.write()?;
     println!("\nFinished writing configuration file.");
     Ok(())
