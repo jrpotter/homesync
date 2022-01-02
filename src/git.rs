@@ -1,5 +1,6 @@
 use super::{config::PathConfig, path};
 use git2::Repository;
+use simplelog::{info, paris};
 use std::{env::VarError, error, fmt, fs, io, path::PathBuf, result};
 
 // ========================================
@@ -143,7 +144,10 @@ pub fn init(config: &PathConfig) -> Result<git2::Repository> {
         // issues that we need to resolve anyways (e.g. setting remote, pulling,
         // managing possible merge conflicts, etc.).
         None => {
-            println!("Creating new homesync repository.");
+            info!(
+                "Creating new homesync repository at <green>{}</>.",
+                config.1.local.display()
+            );
             let repo = Repository::init(&expanded)?;
             fs::File::create(sentinel)?;
             Ok(repo)

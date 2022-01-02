@@ -45,7 +45,7 @@ pub fn run_init(candidates: Vec<ResPathBuf>) -> Result<(), Box<dyn Error>> {
     // git library we chose to use employs async/await so let's wrap around a
     // channel.
     git::init(&config)?;
-    println!("Finished initialization.");
+    println!("\nFinished initialization.");
     Ok(())
 }
 

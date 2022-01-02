@@ -1,5 +1,6 @@
 use super::{config, config::PathConfig, path, path::ResPathBuf};
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
+use simplelog::{error, paris, trace, warn};
 use std::{
     collections::HashSet,
     error::Error,
@@ -9,7 +10,6 @@ use std::{
     time::Duration,
 };
 
-// TODO(jrpotter): Add logging.
 // TODO(jrpotter): Add pid file to only allow one daemon at a time.
 // TODO(jrpotter): Sync files to local git repository.
 
@@ -34,7 +34,7 @@ fn resolve_pending(tx: &Sender<DebouncedEvent>, pending: &HashSet<PathBuf>) -> V
             Ok(None) => (),
             Err(e) => {
                 to_remove.push(path.clone());
-                eprintln!(
+                error!(
                     "Encountered unexpected error {} when processing path {}",
                     e,
                     path.display()
@@ -96,7 +96,7 @@ impl<'a> WatchState<'a> {
                 self.watching.insert(path);
             }
             Err(e) => {
-                eprintln!(
+                error!(
                     "Encountered unexpected error {} when watching path {}",
                     e,
                     path.unresolved().display()
@@ -113,7 +113,7 @@ impl<'a> WatchState<'a> {
             match self.watcher.unwatch(&path) {
                 Ok(()) => (),
                 Err(e) => {
-                    eprintln!(
+                    error!(
                         "Encountered unexpected error {} when unwatching path {}",
                         e,
                         path.unresolved().display()
@@ -159,47 +159,51 @@ pub fn launch(mut config: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Erro
         // Received paths should always be the fully resolved ones so safe to
         // compare against our current config path.
         match watch_rx.recv() {
-            Ok(DebouncedEvent::NoticeWrite(_)) => {
-                // Intentionally ignore in favor of stronger signals.
+            Ok(DebouncedEvent::NoticeWrite(p)) => {
+                trace!("NoticeWrite {}", p.display());
             }
-            Ok(DebouncedEvent::NoticeRemove(_)) => {
-                // Intentionally ignore in favor of stronger signals.
+            Ok(DebouncedEvent::NoticeRemove(p)) => {
+                trace!("NoticeRemove {}", p.display());
             }
             Ok(DebouncedEvent::Create(p)) => {
                 if config.0 == p {
                     config = config::reload(&config)?;
                     state.update(&config);
                 }
-                println!("Create {}", p.display());
+                trace!("Create {}", p.display());
             }
             Ok(DebouncedEvent::Write(p)) => {
                 if config.0 == p {
                     config = config::reload(&config)?;
                     state.update(&config);
                 }
-                println!("Write {}", p.display());
+                trace!("Write {}", p.display());
             }
             // Do not try reloading our primary config in any of the following
             // cases since it may lead to undesired behavior. If our config has
             // e.g. been removed, let's just keep using what we have in memory
             // in the chance it may be added back.
             Ok(DebouncedEvent::Chmod(p)) => {
-                println!("Chmod {}", p.display());
+                trace!("Chmod {}", p.display());
             }
             Ok(DebouncedEvent::Remove(p)) => {
-                println!("Remove {}", p.display());
+                trace!("Remove {}", p.display());
             }
             Ok(DebouncedEvent::Rename(src, dst)) => {
-                println!("Rename {} {}", src.display(), dst.display())
+                trace!("Rename {} {}", src.display(), dst.display())
             }
             Ok(DebouncedEvent::Rescan) => {
-                println!("Rescanning");
+                trace!("Rescanning");
             }
-            Ok(DebouncedEvent::Error(e, _maybe_path)) => {
-                println!("Error {}", e);
+            Ok(DebouncedEvent::Error(e, path)) => {
+                warn!(
+                    "Error {} at {}",
+                    e,
+                    path.unwrap_or_else(|| PathBuf::from("N/A")).display()
+                );
             }
             Err(e) => {
-                println!("watch error: {:?}", e);
+                error!("Watch error: {:?}", e);
             }
         }
     }

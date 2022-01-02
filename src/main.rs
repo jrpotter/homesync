@@ -1,8 +1,20 @@
 use clap::{App, AppSettings, Arg};
 use homesync::path::ResPathBuf;
+use simplelog;
+use simplelog::{error, paris};
 use std::{error::Error, io, path::PathBuf};
 
 fn main() {
+    // Only one logger should ever be initialized and it should be done at the
+    // beginning of the program. Otherwise logs are ignored.
+    simplelog::TermLogger::init(
+        simplelog::LevelFilter::Info,
+        simplelog::Config::default(),
+        simplelog::TerminalMode::Mixed,
+        simplelog::ColorChoice::Auto,
+    )
+    .expect("Could not initialize logger library.");
+
     let matches = App::new("homesync")
         .about("Cross desktop configuration sync tool.")
         .version("0.1.0")
@@ -43,7 +55,7 @@ fn main() {
         .get_matches();
 
     if let Err(e) = dispatch(matches) {
-        eprintln!("{}", e);
+        error!("{}", e);
     }
 }
 
@@ -68,7 +80,7 @@ fn dispatch(matches: clap::ArgMatches) -> Result<(), Box<dyn Error>> {
                     if freq_secs > 0 {
                         homesync::run_daemon(config, freq_secs)?;
                     } else {
-                        eprintln!("Invalid frequency. Expected a positive integer.");
+                        error!("Invalid frequency. Expected a positive integer.");
                     }
                     Ok(())
                 }

@@ -1,6 +1,7 @@
 use super::{path, path::ResPathBuf};
-use ansi_term::Colour::{Green, Yellow};
+use paris::formatter::colorize_string;
 use serde_derive::{Deserialize, Serialize};
+use simplelog::{info, paris};
 use std::{
     collections::BTreeMap,
     env::VarError,
@@ -143,8 +144,10 @@ pub fn load(candidates: &Vec<ResPathBuf>) -> Result<PathConfig> {
 }
 
 pub fn reload(config: &PathConfig) -> Result<PathConfig> {
-    // TODO(jrpotter): Let's add a proper logging solution.
-    println!("Configuration reloaded.");
+    info!(
+        "<green>{}</> configuration reloaded.",
+        config.1.local.display()
+    );
     load(&vec![config.0.clone()])
 }
 
@@ -156,7 +159,7 @@ fn prompt_local(path: Option<&Path>) -> Result<PathBuf> {
     let default = path.map_or("$HOME/.homesync".to_owned(), |p| p.display().to_string());
     print!(
         "Local git repository <{}> (enter to continue): ",
-        Yellow.paint(&default)
+        colorize_string(format!("<yellow>{}</>", &default)),
     );
     io::stdout().flush()?;
     let mut local = String::new();
@@ -176,7 +179,7 @@ fn prompt_remote(url: Option<&Url>) -> Result<Url> {
     });
     print!(
         "Remote git repository <{}> (enter to continue): ",
-        Yellow.paint(&default)
+        colorize_string(format!("<yellow>{}</>", &default)),
     );
     io::stdout().flush()?;
     let mut remote = String::new();
@@ -192,7 +195,7 @@ fn prompt_remote(url: Option<&Url>) -> Result<Url> {
 pub fn write(path: &ResPathBuf, loaded: Option<Config>) -> Result<PathConfig> {
     println!(
         "Generating config at {}...\n",
-        Green.paint(path.unresolved().display().to_string())
+        colorize_string(format!("<green>{}</>", path.unresolved().display())),
     );
     let local = prompt_local(match &loaded {
         Some(c) => Some(c.local.as_ref()),
@@ -221,7 +224,7 @@ pub fn write(path: &ResPathBuf, loaded: Option<Config>) -> Result<PathConfig> {
 pub fn list_packages(config: PathConfig) {
     println!(
         "Listing packages in {}...\n",
-        Green.paint(config.0.unresolved().display().to_string())
+        colorize_string(format!("<green>{}</>", config.0.unresolved().display())),
     );
     // Alphabetical ordered ensured by B-tree implementation.
     for (k, _) in config.1.packages {
