@@ -107,7 +107,7 @@ impl<'a> WatchState<'a> {
 
     /// Reads in the new path config, updating all watched and pending files
     /// according to the packages in the specified config.
-    pub fn update(&mut self, config: &PathConfig) {
+    pub fn update(&mut self, pc: &PathConfig) {
         self.send_poll(PollEvent::Clear);
         for path in &self.watching {
             match self.watcher.unwatch(&path) {
@@ -122,7 +122,7 @@ impl<'a> WatchState<'a> {
             }
         }
         self.watching.clear();
-        for (_, package) in &config.1.packages {
+        for (_, package) in &pc.config.packages {
             for path in &package.configs {
                 match path::soft_resolve(&path) {
                     Ok(None) => self.send_poll(PollEvent::Pending(path.clone())),
@@ -138,7 +138,7 @@ impl<'a> WatchState<'a> {
 // Daemon
 // ========================================
 
-pub fn launch(mut config: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Error>> {
+pub fn launch(mut pc: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Error>> {
     let (poll_tx, poll_rx) = channel();
     let (watch_tx, watch_rx) = channel();
     let watch_tx1 = watch_tx.clone();
@@ -152,9 +152,9 @@ pub fn launch(mut config: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Erro
     // changes to it for hot reloading purposes, and not worry that our wrapper
     // will ever clear it from its watch state.
     let mut watcher: RecommendedWatcher = Watcher::new(watch_tx1, Duration::from_secs(freq_secs))?;
-    watcher.watch(&config.0, RecursiveMode::NonRecursive)?;
+    watcher.watch(&pc.homesync_yml, RecursiveMode::NonRecursive)?;
     let mut state = WatchState::new(poll_tx, &mut watcher)?;
-    state.update(&config);
+    state.update(&pc);
     loop {
         // Received paths should always be the fully resolved ones so safe to
         // compare against our current config path.
@@ -166,16 +166,16 @@ pub fn launch(mut config: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Erro
                 trace!("NoticeRemove {}", p.display());
             }
             Ok(DebouncedEvent::Create(p)) => {
-                if config.0 == p {
-                    config = config::reload(&config)?;
-                    state.update(&config);
+                if pc.homesync_yml == p {
+                    pc = config::reload(&pc)?;
+                    state.update(&pc);
                 }
                 trace!("Create {}", p.display());
             }
             Ok(DebouncedEvent::Write(p)) => {
-                if config.0 == p {
-                    config = config::reload(&config)?;
-                    state.update(&config);
+                if pc.homesync_yml == p {
+                    pc = config::reload(&pc)?;
+                    state.update(&pc);
                 }
                 trace!("Write {}", p.display());
             }

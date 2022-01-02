@@ -19,7 +19,11 @@
             rustc
             rustfmt
           ] ++ lib.optionals stdenv.isDarwin (
-            with darwin.apple_sdk.frameworks; [ CoreServices ]);
+            with darwin.apple_sdk.frameworks; [ CoreServices ]
+          ) ++ lib.optionals stdenv.isLinux [
+              pkgs.openssl
+              pkgs.zlib
+          ];
         };
       });
 }

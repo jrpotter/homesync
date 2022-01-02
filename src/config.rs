@@ -96,17 +96,23 @@ impl Config {
 }
 
 #[derive(Debug)]
-pub struct PathConfig(pub ResPathBuf, pub Config);
+pub struct PathConfig {
+    pub homesync_yml: ResPathBuf,
+    pub config: Config,
+}
 
 impl PathConfig {
     pub fn new(path: &ResPathBuf, config: Config) -> Self {
-        PathConfig(path.clone(), config)
+        PathConfig {
+            homesync_yml: path.clone(),
+            config,
+        }
     }
 
     // TODO(jrpotter): Create backup file before overwriting.
     pub fn write(&self) -> Result<()> {
-        let mut file = fs::File::create(&self.0)?;
-        let serialized = serde_yaml::to_string(&self.1)?;
+        let mut file = fs::File::create(&self.homesync_yml)?;
+        let serialized = serde_yaml::to_string(&self.config)?;
         file.write_all(serialized.as_bytes())?;
         Ok(())
     }
@@ -143,12 +149,12 @@ pub fn load(candidates: &Vec<ResPathBuf>) -> Result<PathConfig> {
     Err(Error::MissingConfig)
 }
 
-pub fn reload(config: &PathConfig) -> Result<PathConfig> {
+pub fn reload(pc: &PathConfig) -> Result<PathConfig> {
     info!(
         "<green>{}</> configuration reloaded.",
-        config.1.local.display()
+        pc.config.local.display()
     );
-    load(&vec![config.0.clone()])
+    load(&vec![pc.homesync_yml.clone()])
 }
 
 // ========================================
@@ -205,14 +211,14 @@ pub fn write(path: &ResPathBuf, loaded: Option<Config>) -> Result<PathConfig> {
         Some(c) => Some(&c.remote),
         None => None,
     })?;
-    let generated = PathConfig(
-        path.clone(),
-        Config {
+    let generated = PathConfig {
+        homesync_yml: path.clone(),
+        config: Config {
             local,
             remote,
             packages: loaded.map_or(BTreeMap::new(), |c| c.packages),
         },
-    );
+    };
     generated.write()?;
     Ok(generated)
 }
@@ -221,13 +227,16 @@ pub fn write(path: &ResPathBuf, loaded: Option<Config>) -> Result<PathConfig> {
 // Listing
 // ========================================
 
-pub fn list_packages(config: PathConfig) {
+pub fn list_packages(pc: PathConfig) {
     println!(
         "Listing packages in {}...\n",
-        colorize_string(format!("<green>{}</>", config.0.unresolved().display())),
+        colorize_string(format!(
+            "<green>{}</>",
+            pc.homesync_yml.unresolved().display()
+        )),
     );
     // Alphabetical ordered ensured by B-tree implementation.
-    for (k, _) in config.1.packages {
+    for (k, _) in pc.config.packages {
         println!("• {}", k);
     }
 }

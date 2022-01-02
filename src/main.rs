@@ -16,7 +16,7 @@ fn main() {
     .expect("Could not initialize logger library.");
 
     let matches = App::new("homesync")
-        .about("Cross desktop configuration sync tool.")
+        .about("Cross desktop sync tool.")
         .version("0.1.0")
         .setting(AppSettings::SubcommandRequiredElseHelp)
         .author("Joshua Potter <jrpotter.github.io>")
@@ -28,7 +28,9 @@ fn main() {
                 .help("Specify a configuration file to use in place of defaults")
                 .takes_value(true),
         )
-        .subcommand(App::new("add").about("Add new configuration to local repository"))
+        .subcommand(
+            App::new("apply").about("Find all changes and apply them to the local repository"),
+        )
         .subcommand(
             App::new("daemon")
                 .about("Start up a new homesync daemon")
@@ -50,8 +52,6 @@ fn main() {
         )
         .subcommand(App::new("init").about("Initialize the homesync local repository"))
         .subcommand(App::new("list").about("See which packages homesync manages"))
-        .subcommand(App::new("pull").about("Pull remote repository into local repository"))
-        .subcommand(App::new("push").about("Push local repository to remote repository"))
         .get_matches();
 
     if let Err(e) = dispatch(matches) {
@@ -71,7 +71,7 @@ fn dispatch(matches: clap::ArgMatches) -> Result<(), Box<dyn Error>> {
         subcommand => {
             let config = homesync::config::load(&candidates)?;
             match subcommand {
-                Some(("add", _)) => Ok(homesync::run_add(config)?),
+                Some(("apply", _)) => Ok(homesync::run_apply(config)?),
                 Some(("daemon", matches)) => {
                     let freq_secs: u64 = match matches.value_of("frequency") {
                         Some(f) => f.parse().unwrap_or(0),
@@ -85,8 +85,6 @@ fn dispatch(matches: clap::ArgMatches) -> Result<(), Box<dyn Error>> {
                     Ok(())
                 }
                 Some(("list", _)) => Ok(homesync::run_list(config)?),
-                Some(("pull", _)) => Ok(homesync::run_pull(config)?),
-                Some(("push", _)) => Ok(homesync::run_push(config)?),
                 _ => unreachable!(),
             }
         }

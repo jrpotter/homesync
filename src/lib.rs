@@ -7,17 +7,20 @@ use config::PathConfig;
 use path::ResPathBuf;
 use std::{error::Error, io};
 
-pub fn run_add(_config: PathConfig) -> Result<(), config::Error> {
-    // TODO(jrpotter): Show $EDITOR that allows writing specific package.
+type Result = std::result::Result<(), Box<dyn Error>>;
+
+pub fn run_apply(config: PathConfig) -> Result {
+    let repo = git::init(&config)?;
+    git::apply(&config, &repo)?;
     Ok(())
 }
 
-pub fn run_daemon(config: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Error>> {
+pub fn run_daemon(config: PathConfig, freq_secs: u64) -> Result {
     daemon::launch(config, freq_secs)?;
     Ok(())
 }
 
-pub fn run_init(candidates: Vec<ResPathBuf>) -> Result<(), Box<dyn Error>> {
+pub fn run_init(candidates: Vec<ResPathBuf>) -> Result {
     debug_assert!(!candidates.is_empty(), "Empty candidates found in `init`.");
     if candidates.is_empty() {
         Err(config::Error::IOError(io::Error::new(
@@ -29,7 +32,7 @@ pub fn run_init(candidates: Vec<ResPathBuf>) -> Result<(), Box<dyn Error>> {
         // Check if we already have a local config somewhere. If so, reprompt
         // the same configuration options and override the values present in the
         // current YAML file.
-        Ok(loaded) => config::write(&loaded.0, Some(loaded.1))?,
+        Ok(loaded) => config::write(&loaded.homesync_yml, Some(loaded.config))?,
         // Otherwise create a new config file at the given location. We always
         // assume we want to write to the first file in our priority list. If
         // not, the user should specify which config they want to write using
@@ -41,23 +44,12 @@ pub fn run_init(candidates: Vec<ResPathBuf>) -> Result<(), Box<dyn Error>> {
         }
         Err(e) => Err(e)?,
     };
-    // Verify (or create) our local and remote git repositories. The internal
-    // git library we chose to use employs async/await so let's wrap around a
-    // channel.
     git::init(&config)?;
     println!("\nFinished initialization.");
     Ok(())
 }
 
-pub fn run_list(config: PathConfig) -> Result<(), config::Error> {
+pub fn run_list(config: PathConfig) -> Result {
     config::list_packages(config);
-    Ok(())
-}
-
-pub fn run_pull(_config: PathConfig) -> Result<(), Box<dyn Error>> {
-    Ok(())
-}
-
-pub fn run_push(_config: PathConfig) -> Result<(), Box<dyn Error>> {
     Ok(())
 }

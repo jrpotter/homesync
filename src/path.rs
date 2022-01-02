@@ -1,4 +1,3 @@
-use regex::Regex;
 use serde::{
     de,
     de::{Unexpected, Visitor},
@@ -61,13 +60,30 @@ pub struct ResPathBuf {
     unresolved: PathBuf,
 }
 
+fn unresolved_error(path: &Path) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::Other,
+        format!("Path '{}' should be fully resolved.", path.display()),
+    )
+}
+
 impl ResPathBuf {
-    pub fn display(&self) -> std::path::Display {
-        self.inner.display()
+    pub fn new(path: &Path) -> Result<Self> {
+        if !path.is_absolute() {
+            Err(unresolved_error(path))?;
+        }
+        Ok(ResPathBuf {
+            inner: path.to_path_buf(),
+            unresolved: path.to_path_buf(),
+        })
+    }
+
+    pub fn resolved(&self) -> &PathBuf {
+        &self.inner
     }
 
     pub fn unresolved(&self) -> &PathBuf {
-        return &self.unresolved;
+        &self.unresolved
     }
 }
 
@@ -214,20 +230,8 @@ pub fn validate_is_dir(path: &Path) -> Result<()> {
 /// Find environment variables within the argument and expand them if possible.
 ///
 /// Returns an error if any found environment variables are not defined.
-pub fn expand_env(s: &str) -> Result<String> {
-    let re = Regex::new(r"\$(?P<env>[[:alnum:]]+)").unwrap();
-    let mut path = s.to_owned();
-    for caps in re.captures_iter(s) {
-        let evar = env::var(&caps["env"])?;
-        path = path.replace(&format!("${}", &caps["env"]), &evar);
-    }
-    Ok(path)
-}
-
-/// Attempt to resolve the provided path, returning a fully resolved path
-/// instance if successful.
-pub fn resolve(path: &Path) -> Result<ResPathBuf> {
-    let mut resolved = env::current_dir()?;
+pub fn expand(path: &Path) -> Result<PathBuf> {
+    let mut expanded = env::current_dir()?;
     for comp in path.components() {
         match comp {
             Component::Prefix(_) => Err(io::Error::new(
@@ -235,12 +239,12 @@ pub fn resolve(path: &Path) -> Result<ResPathBuf> {
                 "We do not currently support Windows.",
             ))?,
             Component::RootDir => {
-                resolved.clear();
-                resolved.push(Component::RootDir)
+                expanded.clear();
+                expanded.push(Component::RootDir)
             }
             Component::CurDir => (),
             Component::ParentDir => {
-                if !resolved.pop() {
+                if !expanded.pop() {
                     Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
                         "Cannot take parent of root.",
@@ -248,11 +252,23 @@ pub fn resolve(path: &Path) -> Result<ResPathBuf> {
                 }
             }
             Component::Normal(c) => {
-                let c: OsString = expand_env(&c.to_string_lossy())?.into();
-                resolved.push(Component::Normal(&c));
+                let lossy = c.to_string_lossy();
+                if lossy.starts_with("$") {
+                    let evar = env::var(lossy.replacen("$", "", 1))?;
+                    expanded.push(Component::Normal(&OsString::from(evar)));
+                } else {
+                    expanded.push(c);
+                }
             }
         }
     }
+    Ok(expanded)
+}
+
+/// Attempt to resolve the provided path, returning a fully resolved path
+/// instance if successful.
+pub fn resolve(path: &Path) -> Result<ResPathBuf> {
+    let resolved = expand(&path)?;
     let resolved = resolved.canonicalize()?;
     Ok(ResPathBuf {
         inner: resolved,
