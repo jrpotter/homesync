@@ -4,11 +4,21 @@ use simplelog;
 use simplelog::{error, paris};
 use std::{error::Error, io, path::PathBuf};
 
+#[cfg(debug_assertions)]
+fn log_level() -> simplelog::LevelFilter {
+    simplelog::LevelFilter::Trace
+}
+
+#[cfg(not(debug_assertions))]
+fn log_level() {
+    simplelog::LevelFilter::Info
+}
+
 fn main() {
     // Only one logger should ever be initialized and it should be done at the
     // beginning of the program. Otherwise logs are ignored.
     simplelog::TermLogger::init(
-        simplelog::LevelFilter::Info,
+        log_level(),
         simplelog::Config::default(),
         simplelog::TerminalMode::Mixed,
         simplelog::ColorChoice::Auto,

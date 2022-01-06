@@ -1,4 +1,5 @@
-use super::{config, config::PathConfig, path, path::ResPathBuf};
+use super::{config, config::PathConfig, git, path, path::ResPathBuf};
+use git2::Repository;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use simplelog::{error, paris, trace, warn};
 use std::{
@@ -138,7 +139,7 @@ impl<'a> WatchState<'a> {
 // Daemon
 // ========================================
 
-pub fn launch(mut pc: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Error>> {
+pub fn launch(mut pc: PathConfig, repo: Repository, freq_secs: u64) -> Result<(), Box<dyn Error>> {
     let (poll_tx, poll_rx) = channel();
     let (watch_tx, watch_rx) = channel();
     let watch_tx1 = watch_tx.clone();
@@ -156,48 +157,62 @@ pub fn launch(mut pc: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Error>> 
     let mut state = WatchState::new(poll_tx, &mut watcher)?;
     state.update(&pc);
     loop {
-        // Received paths should always be the fully resolved ones so safe to
-        // compare against our current config path.
+        git::apply(&pc, &repo)?;
+        // Received paths should always be fully resolved.
         match watch_rx.recv() {
             Ok(DebouncedEvent::NoticeWrite(p)) => {
-                trace!("NoticeWrite {}", p.display());
+                trace!("NoticeWrite '{}'", p.display());
             }
             Ok(DebouncedEvent::NoticeRemove(p)) => {
-                trace!("NoticeRemove {}", p.display());
+                trace!("NoticeRemove '{}'", p.display());
             }
             Ok(DebouncedEvent::Create(p)) => {
+                trace!("Create '{}'", p.display());
                 if pc.homesync_yml == p {
                     pc = config::reload(&pc)?;
                     state.update(&pc);
                 }
-                trace!("Create {}", p.display());
             }
             Ok(DebouncedEvent::Write(p)) => {
+                trace!("Write '{}'", p.display());
                 if pc.homesync_yml == p {
                     pc = config::reload(&pc)?;
                     state.update(&pc);
                 }
-                trace!("Write {}", p.display());
             }
             // Do not try reloading our primary config in any of the following
             // cases since it may lead to undesired behavior. If our config has
             // e.g. been removed, let's just keep using what we have in memory
             // in the chance it may be added back.
             Ok(DebouncedEvent::Chmod(p)) => {
-                trace!("Chmod {}", p.display());
+                trace!("Chmod '{}'", p.display());
             }
             Ok(DebouncedEvent::Remove(p)) => {
-                trace!("Remove {}", p.display());
+                if pc.homesync_yml == p {
+                    warn!(
+                        "Removed primary config '{}'. Continuing to use last loaded state",
+                        p.display()
+                    );
+                } else {
+                    trace!("Remove '{}'", p.display());
+                }
             }
             Ok(DebouncedEvent::Rename(src, dst)) => {
-                trace!("Rename {} {}", src.display(), dst.display())
+                if pc.homesync_yml == src && pc.homesync_yml != dst {
+                    warn!(
+                        "Renamed primary config '{}'. Continuing to use last loaded state",
+                        src.display()
+                    );
+                } else {
+                    trace!("Renamed '{}' to '{}'", src.display(), dst.display())
+                }
             }
             Ok(DebouncedEvent::Rescan) => {
                 trace!("Rescanning");
             }
             Ok(DebouncedEvent::Error(e, path)) => {
                 warn!(
-                    "Error {} at {}",
+                    "Error {} at '{}'",
                     e,
                     path.unwrap_or_else(|| PathBuf::from("N/A")).display()
                 );

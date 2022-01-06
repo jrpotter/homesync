@@ -16,7 +16,8 @@ pub fn run_apply(config: PathConfig) -> Result {
 }
 
 pub fn run_daemon(config: PathConfig, freq_secs: u64) -> Result {
-    daemon::launch(config, freq_secs)?;
+    let repo = git::init(&config)?;
+    daemon::launch(config, repo, freq_secs)?;
     Ok(())
 }
 

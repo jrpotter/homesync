@@ -65,6 +65,19 @@ $ homesync pull --all
 This will load up a diff wrapper for you to ensure you make the changes you'd
 like.
 
+## Known Issues
+
+If using (neo)vim, the daemon watcher will stop watching a given configuration
+file after editing. Refer to [this issue](https://github.com/notify-rs/notify/issues/247)
+for more details. As a workaround, you can set the following in your `init.vim`
+file:
+
+```vimscript
+backupcopy=yes
+```
+
+Refer to `:h backupcopy` for details on how this works.
+
 ## Contribution
 
 Install git hooks as follows:
