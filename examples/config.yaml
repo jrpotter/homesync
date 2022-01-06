@@ -2,9 +2,33 @@
 local: $HOME/.homesync
 remote: "https://github.com/jrpotter/home-config.git"
 packages:
+  alacritty:
+    configs:
+      - $HOME/.alacritty.yml
+      - $HOME/.config/alacritty/alacritty.yml
+      - $XDG_CONFIG_HOME/alacritty.yml
+      - $XDG_CONFIG_HOME/alacritty/alacritty.yml
+  bash:
+    configs:
+      - $HOME/.bash_profile
+      - $HOME/.bashrc
+  home-manager:
+    configs:
+      - $HOME/home.nix
   homesync:
     configs:
       - $HOME/.homesync.yml
       - $HOME/.config/homesync/homesync.yml
       - $XDG_CONFIG_HOME/homesync.yml
       - $XDG_CONFIG_HOME/homesync/homesync.yml
+  neovim:
+    configs:
+      - $HOME/.config/nvim/init.vim
+      - $XDG_CONFIG_HOME/nvim/init.vim
+  termite:
+    configs:
+      - $HOME/.config/termite/config
+      - $XDG_CONFIG_HOME/termite/config
+  tmux:
+    configs:
+      - $HOME/.tmux.conf
