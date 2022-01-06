@@ -83,9 +83,16 @@ pub struct Package {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct Remote {
+    pub name: String,
+    pub branch: String,
+    pub url: Url,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
     pub local: PathBuf,
-    pub remote: Url,
+    pub remote: Remote,
     pub packages: BTreeMap<String, Package>,
 }
 
@@ -161,41 +168,66 @@ pub fn reload(pc: &PathConfig) -> Result<PathConfig> {
 // Creation
 // ========================================
 
-fn prompt_local(path: Option<&Path>) -> Result<PathBuf> {
-    let default = path.map_or("$HOME/.homesync".to_owned(), |p| p.display().to_string());
-    print!(
-        "Local git repository <{}> (enter to continue): ",
-        colorize_string(format!("<yellow>{}</>", &default)),
-    );
+fn prompt_default(prompt: &str, default: String) -> Result<String> {
+    print!("{}", prompt);
     io::stdout().flush()?;
-    let mut local = String::new();
-    io::stdin().read_line(&mut local)?;
-    // Defer validation this path until initialization of the repository.
-    let local = local.trim();
-    if local.is_empty() {
-        Ok(PathBuf::from(default))
+    let mut value = String::new();
+    io::stdin().read_line(&mut value)?;
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        Ok(default)
     } else {
-        Ok(PathBuf::from(local))
+        Ok(trimmed.to_owned())
     }
 }
 
-fn prompt_remote(url: Option<&Url>) -> Result<Url> {
-    let default = url.map_or("https://github.com/owner/repo.git".to_owned(), |u| {
-        u.to_string()
+fn prompt_local(path: Option<&Path>) -> Result<PathBuf> {
+    let default = path.map_or("$HOME/.homesync".to_owned(), |p| p.display().to_string());
+    let value = prompt_default(
+        &format!(
+            "Local git repository <{}> (enter to continue): ",
+            colorize_string(format!("<yellow>{}</>", &default)),
+        ),
+        default,
+    )?;
+    Ok(PathBuf::from(value))
+}
+
+fn prompt_remote(remote: Option<&Remote>) -> Result<Remote> {
+    let default_name = remote.map_or("origin".to_owned(), |r| r.name.to_owned());
+    let remote_name = prompt_default(
+        &format!(
+            "Remote git name <{}> (enter to continue): ",
+            colorize_string(format!("<yellow>{}</>", &default_name))
+        ),
+        default_name,
+    )?;
+
+    let default_branch = remote.map_or("origin".to_owned(), |r| r.branch.to_owned());
+    let remote_branch = prompt_default(
+        &format!(
+            "Remote git branch <{}> (enter to continue): ",
+            colorize_string(format!("<yellow>{}</>", &default_branch))
+        ),
+        default_branch,
+    )?;
+
+    let default_url = remote.map_or("https://github.com/owner/repo.git".to_owned(), |r| {
+        r.url.to_string()
     });
-    print!(
-        "Remote git repository <{}> (enter to continue): ",
-        colorize_string(format!("<yellow>{}</>", &default)),
-    );
-    io::stdout().flush()?;
-    let mut remote = String::new();
-    io::stdin().read_line(&mut remote)?;
-    let remote = remote.trim();
-    if remote.is_empty() {
-        Ok(Url::parse(&default)?)
-    } else {
-        Ok(Url::parse(&remote)?)
-    }
+    let remote_url = prompt_default(
+        &format!(
+            "Remote git url <{}> (enter to continue): ",
+            colorize_string(format!("<yellow>{}</>", &default_url))
+        ),
+        default_url,
+    )?;
+
+    Ok(Remote {
+        name: remote_name,
+        branch: remote_branch,
+        url: Url::parse(&remote_url)?,
+    })
 }
 
 pub fn write(path: &ResPathBuf, loaded: Option<Config>) -> Result<PathConfig> {

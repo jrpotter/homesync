@@ -1,6 +1,9 @@
 ---
 local: $HOME/.homesync
-remote: "https://github.com/jrpotter/home-config.git"
+remote:
+  name: origin
+  branch: master
+  url: "https://github.com/jrpotter/home-config.git"
 packages:
   alacritty:
     configs:

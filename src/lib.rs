@@ -54,3 +54,9 @@ pub fn run_list(config: PathConfig) -> Result {
     config::list_packages(config);
     Ok(())
 }
+
+pub fn run_push(config: PathConfig) -> Result {
+    let mut repo = git::init(&config)?;
+    git::push(&config, &mut repo)?;
+    Ok(())
+}

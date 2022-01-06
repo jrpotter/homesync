@@ -62,6 +62,7 @@ fn main() {
         )
         .subcommand(App::new("init").about("Initialize the homesync local repository"))
         .subcommand(App::new("list").about("See which packages homesync manages"))
+        .subcommand(App::new("push").about("Push changes from local to remote"))
         .get_matches();
 
     if let Err(e) = dispatch(matches) {
@@ -95,6 +96,7 @@ fn dispatch(matches: clap::ArgMatches) -> Result<(), Box<dyn Error>> {
                     Ok(())
                 }
                 Some(("list", _)) => Ok(homesync::run_list(config)?),
+                Some(("push", _)) => Ok(homesync::run_push(config)?),
                 _ => unreachable!(),
             }
         }

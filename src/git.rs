@@ -1,5 +1,5 @@
 use super::{config::PathConfig, path};
-use git2::Repository;
+use git2::{IndexAddOption, ObjectType, Remote, Repository, Signature, StashFlags};
 use path::ResPathBuf;
 use simplelog::{info, paris};
 use std::{
@@ -9,35 +9,6 @@ use std::{
     path::{Path, PathBuf},
     result,
 };
-
-// All git error codes.
-// TODO(jrpotter): Remove these once done needing to reference them.
-// git2::ErrorCode::GenericError => panic!("generic"),
-// git2::ErrorCode::NotFound => panic!("not_found"),
-// git2::ErrorCode::Exists => panic!("exists"),
-// git2::ErrorCode::Ambiguous => panic!("ambiguous"),
-// git2::ErrorCode::BufSize => panic!("buf_size"),
-// git2::ErrorCode::User => panic!("user"),
-// git2::ErrorCode::BareRepo => panic!("bare_repo"),
-// git2::ErrorCode::UnbornBranch => panic!("unborn_branch"),
-// git2::ErrorCode::Unmerged => panic!("unmerged"),
-// git2::ErrorCode::NotFastForward => panic!("not_fast_forward"),
-// git2::ErrorCode::InvalidSpec => panic!("invalid_spec"),
-// git2::ErrorCode::Conflict => panic!("conflict"),
-// git2::ErrorCode::Locked => panic!("locked"),
-// git2::ErrorCode::Modified => panic!("modified"),
-// git2::ErrorCode::Auth => panic!("auth"),
-// git2::ErrorCode::Certificate => panic!("certificate"),
-// git2::ErrorCode::Applied => panic!("applied"),
-// git2::ErrorCode::Peel => panic!("peel"),
-// git2::ErrorCode::Eof => panic!("eof"),
-// git2::ErrorCode::Invalid => panic!("invalid"),
-// git2::ErrorCode::Uncommitted => panic!("uncommitted"),
-// git2::ErrorCode::Directory => panic!("directory"),
-// git2::ErrorCode::MergeConflict => panic!("merge_conflict"),
-// git2::ErrorCode::HashsumMismatch => panic!("hashsum_mismatch"),
-// git2::ErrorCode::IndexDirty => panic!("index_dirty"),
-// git2::ErrorCode::ApplyFail => panic!("apply_fail"),
 
 // ========================================
 // Error
@@ -230,5 +201,82 @@ pub fn apply(pc: &PathConfig, repo: &Repository) -> Result<()> {
         }
         fs::copy(package_file.resolved(), copy)?;
     }
+    Ok(())
+}
+
+// ========================================
+// Syncing
+// ========================================
+
+fn get_remote<'repo>(pc: &PathConfig, repo: &'repo Repository) -> Result<Remote<'repo>> {
+    // Sets a new remote if it does not yet exist.
+    repo.remote_set_url(&pc.config.remote.name, &pc.config.remote.url.to_string())?;
+    // We could go with "*" instead of referencing the one branch, but let's be
+    // specific for the time being.
+    // https://git-scm.com/book/en/v2/Git-Internals-The-Refspec
+    repo.remote_add_fetch(
+        &pc.config.remote.name,
+        &format!(
+            "+refs/heads/{branch}:refs/remotes/origin/{branch}",
+            branch = pc.config.remote.branch
+        ),
+    )?;
+    Ok(repo.find_remote(&pc.config.remote.name)?)
+}
+
+pub fn push(pc: &PathConfig, repo: &mut Repository) -> Result<()> {
+    repo.workdir().ok_or(Error::NotWorkingRepo)?;
+    // Switch to the new branch we want to work on. If the branch does not
+    // exist, `set_head` will point to an unborn branch.
+    // https://git-scm.com/docs/git-check-ref-format.
+    repo.set_head(&format!("refs/heads/{}", pc.config.remote.branch))?;
+    // Establish our remote. If the remote already exists, re-configure it
+    // blindly to point to the appropriate url. Our results should now exist
+    // in a branch called `remotes/origin/<branch>`.
+    // https://git-scm.com/book/it/v2/Git-Basics-Working-with-Remotes
+    // TODO(jrpotter): Rebase against the remote.
+    let mut remote = get_remote(&pc, &repo)?;
+    remote.fetch(&[&pc.config.remote.branch], None, None)?;
+    // Find the latest commit on our current branch. This could be empty if just
+    // having initialized the repository.
+    let parent_commit = match repo.head() {
+        Ok(head) => {
+            let obj = head
+                .resolve()?
+                .peel(ObjectType::Commit)?
+                .into_commit()
+                .map_err(|_| git2::Error::from_str("Couldn't find commit"))?;
+            vec![obj]
+        }
+        // An unborn branch error is fired when first initializing the
+        // repository. Our first commit will create the branch.
+        Err(e) => match e.code() {
+            git2::ErrorCode::UnbornBranch => vec![],
+            _ => Err(e)?,
+        },
+    };
+    // The index corresponds to our staging area. We add all files and write out
+    // to a tree. The resulting tree can be found using `git ls-tree <oid>`.
+    // https://git-scm.com/book/en/v2/Git-Internals-Git-Objects
+    let mut index = repo.index()?;
+    index.add_all(["."].iter(), IndexAddOption::DEFAULT, None)?;
+    let index_oid = index.write_tree()?;
+    let index_tree = repo.find_tree(index_oid)?;
+    // Stash any of our changes. We will first fetch from the remote and then
+    // apply our changes on top of it.
+    // TODO(jrpotter): Add user and email to config. Remove init comamnd.
+    // TODO(jrpotter): Cannot stash changes with no initial commit.
+    let signature = Signature::now("homesync", "robot@homesync.org")?;
+    let commit_oid = repo.commit(
+        Some("HEAD"),
+        &signature,
+        &signature,
+        // TODO(jrpotter): See how many previous pushes were made.
+        "homesync push",
+        &index_tree,
+        // iter/collect to collect an array of references.
+        &parent_commit.iter().collect::<Vec<_>>()[..],
+    )?;
+    let _commit = repo.find_commit(commit_oid)?;
     Ok(())
 }
