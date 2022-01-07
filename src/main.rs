@@ -58,6 +58,7 @@ fn main() {
                 ),
         )
         .subcommand(App::new("list").about("See which packages homesync manages"))
+        .subcommand(App::new("pull").about("Pull changes from remote to local"))
         .subcommand(App::new("push").about("Push changes from local to remote"))
         .subcommand(
             App::new("stage").about("Find all changes and stage them onto the local repository"),
@@ -86,6 +87,7 @@ fn dispatch(matches: clap::ArgMatches) -> Result<(), Box<dyn Error>> {
             Ok(())
         }
         Some(("list", _)) => Ok(homesync::run_list(config)?),
+        Some(("pull", _)) => Ok(homesync::run_pull(config)?),
         Some(("push", _)) => Ok(homesync::run_push(config)?),
         Some(("stage", _)) => Ok(homesync::run_stage(config)?),
         _ => unreachable!(),

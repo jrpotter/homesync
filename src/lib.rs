@@ -25,6 +25,12 @@ pub fn run_push(config: PathConfig) -> Result {
     Ok(())
 }
 
+pub fn run_pull(config: PathConfig) -> Result {
+    let repo = git::init(&config)?;
+    git::pull(&config, &repo)?;
+    Ok(())
+}
+
 pub fn run_stage(config: PathConfig) -> Result {
     let repo = git::init(&config)?;
     git::stage(&config, &repo)?;

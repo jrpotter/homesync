@@ -1,7 +1,10 @@
 use super::{config::PathConfig, path};
-use git2::{IndexAddOption, ObjectType, Remote, Repository, Signature};
+use git2::{
+    Branch, BranchType, Commit, IndexAddOption, ObjectType, Reference, Remote, Repository,
+    Signature,
+};
 use path::ResPathBuf;
-use simplelog::{info, paris};
+use simplelog::{info, paris, warn};
 use std::{
     collections::HashSet,
     env::VarError,
@@ -20,8 +23,7 @@ pub type Result<T> = result::Result<T, Error>;
 pub enum Error {
     GitError(git2::Error),
     IOError(io::Error),
-    NotHomesyncRepo,
-    NotWorkingRepo,
+    InvalidBareRepo,
     VarError(VarError),
 }
 
@@ -57,11 +59,7 @@ impl fmt::Display for Error {
         match self {
             Error::GitError(e) => write!(f, "{}", e),
             Error::IOError(e) => write!(f, "{}", e),
-            Error::NotHomesyncRepo => write!(
-                f,
-                "Local repository is not managed by `homesync`. Missing `.homesync` sentinel file."
-            ),
-            Error::NotWorkingRepo => write!(
+            Error::InvalidBareRepo => write!(
                 f,
                 "Local repository should be a working directory. Did you manually initialize with `--bare`?"
             ),
@@ -76,12 +74,39 @@ impl error::Error for Error {}
 // Initialization
 // ========================================
 
+fn clone_or_init(pc: &PathConfig, expanded: &Path) -> Result<Repository> {
+    match Repository::clone(&pc.config.remote.url.to_string(), &expanded) {
+        Ok(repo) => {
+            info!(
+                "Cloned remote repository <green>{}</>.",
+                &pc.config.remote.url
+            );
+            Ok(repo)
+        }
+        Err(e) if (e.code() == git2::ErrorCode::NotFound || e.code() == git2::ErrorCode::Auth) => {
+            // TODO(jrpotter): Setup authentication callbacks so private
+            // repositories work.
+            // https://docs.rs/git2/0.13.25/git2/build/struct.RepoBuilder.html#example
+            if e.code() == git2::ErrorCode::Auth {
+                warn!("Could not authenticate against remote. Are you using a public repository?");
+            }
+            info!(
+                "Creating local repository at <green>{}</>.",
+                pc.config.local.display()
+            );
+            Ok(Repository::init(&expanded)?)
+        }
+        Err(e) => Err(e)?,
+    }
+}
+
 /// Sets up a local github repository all configuration files will be synced to.
 /// If there does not exist a local repository at the requested location, we
-/// attempt to make it.
+/// attempt to make it via cloning or initializing.
 ///
-/// NOTE! This does not perform any syncing between local and remote. In fact,
-/// this method does not perform any validation on remote at all.
+/// TODO(jrpotter): Setup a sentinel file in the given repository. This is used
+/// for both ensuring any remote repositories are already managed by homesync
+/// and for storing any persisted configurations.
 pub fn init(pc: &PathConfig) -> Result<Repository> {
     // Permit the use of environment variables within the local configuration
     // path (e.g. `$HOME`). Unlike with resolution, we want to fail if the
@@ -94,40 +119,17 @@ pub fn init(pc: &PathConfig) -> Result<Repository> {
     // - the directory is not git-initialized (i.e. has a valid `.git`
     //   subfolder).
     // - the directory does not have appropriate permissions.
-    let local = match Repository::open(&expanded) {
-        Ok(repo) => Some(repo),
-        Err(e) => match e.code() {
-            git2::ErrorCode::NotFound => None,
-            _ => Err(e)?,
-        },
-    };
-    // Setup a sentinel file in the given repository. This is used for both
-    // ensuring any remote repositories are already managed by homesync and for
-    // storing any persisted configurations.
-    let mut sentinel = PathBuf::from(&expanded);
-    sentinel.push(".homesync");
-    match local {
-        Some(repo) => {
-            // Verify the given repository has a homesync sentinel file.
-            match path::validate_is_file(&sentinel) {
-                Ok(_) => (),
-                Err(_) => Err(Error::NotHomesyncRepo)?,
-            };
-            Ok(repo)
-        }
-        // If no local repository exists, we choose to just always initialize a
-        // new one instead of cloning from remote. Cloning has a separate set of
-        // issues that we need to resolve anyways (e.g. setting remote, pulling,
-        // managing possible merge conflicts, etc.).
-        None => {
+    // - the remote repository is not found
+    match Repository::open(&expanded) {
+        Ok(repo) => {
             info!(
-                "Creating new homesync repository at <green>{}</>.",
-                pc.config.local.display()
+                "Opened local repository <green>{}</>.",
+                &pc.config.local.display()
             );
-            let repo = Repository::init(&expanded)?;
-            fs::File::create(sentinel)?;
             Ok(repo)
         }
+        Err(e) if e.code() == git2::ErrorCode::NotFound => Ok(clone_or_init(&pc, &expanded)?),
+        Err(e) => Err(e)?,
     }
 }
 
@@ -167,7 +169,7 @@ fn find_package_files(pc: &PathConfig) -> Vec<ResPathBuf> {
 }
 
 pub fn stage(pc: &PathConfig, repo: &Repository) -> Result<()> {
-    let workdir = repo.workdir().ok_or(Error::NotWorkingRepo)?;
+    let workdir = repo.workdir().ok_or(Error::InvalidBareRepo)?;
     let repo_files = find_repo_files(&workdir)?;
     let package_files = find_package_files(&pc);
     // Find all files in our repository that are no longer being referenced in
@@ -208,24 +210,8 @@ pub fn stage(pc: &PathConfig, repo: &Repository) -> Result<()> {
 // Syncing
 // ========================================
 
-fn get_remote<'repo>(pc: &PathConfig, repo: &'repo Repository) -> Result<Remote<'repo>> {
-    // Sets a new remote if it does not yet exist.
-    repo.remote_set_url(&pc.config.remote.name, &pc.config.remote.url.to_string())?;
-    // We could go with "*" instead of referencing the one branch, but let's be
-    // specific for the time being.
-    // https://git-scm.com/book/en/v2/Git-Internals-The-Refspec
-    repo.remote_add_fetch(
-        &pc.config.remote.name,
-        &format!(
-            "+refs/heads/{branch}:refs/remotes/origin/{branch}",
-            branch = pc.config.remote.branch
-        ),
-    )?;
-    Ok(repo.find_remote(&pc.config.remote.name)?)
-}
-
 pub fn push(pc: &PathConfig, repo: &mut Repository) -> Result<()> {
-    repo.workdir().ok_or(Error::NotWorkingRepo)?;
+    repo.workdir().ok_or(Error::InvalidBareRepo)?;
     // Switch to the new branch we want to work on. If the branch does not
     // exist, `set_head` will point to an unborn branch.
     // https://git-scm.com/docs/git-check-ref-format.
@@ -279,4 +265,90 @@ pub fn push(pc: &PathConfig, repo: &mut Repository) -> Result<()> {
     )?;
     let _commit = repo.find_commit(commit_oid)?;
     Ok(())
+}
+
+pub fn pull(pc: &PathConfig, repo: &Repository) -> Result<()> {
+    validate_repo(&repo)?;
+
+    let mut remote = get_remote(&pc, &repo)?;
+    remote.fetch(&[&pc.config.remote.branch], None, None)?;
+    let remote_branch_name = format!("{}/{}", &pc.config.remote.name, &pc.config.remote.branch);
+    let remote_branch = repo.find_branch(&remote_branch_name, BranchType::Remote)?;
+    info!("Fetched remote branch `{}`.", remote_branch_name);
+
+    // There are two cases we need to consider:
+    //
+    // 1. Our local branch actually exists, in which case there are commits
+    // available. These should be rebased relative to remote (our upstream).
+    // 2. Our repository has been initialized in an empty state. The branch we
+    // are interested in is unborn, so we can just copy the branch from remote.
+    let remote_ref = repo.reference_to_annotated_commit(remote_branch.get())?;
+    if let Ok(local_branch) = repo.find_branch(&pc.config.remote.branch, BranchType::Local) {
+        let local_ref = repo.reference_to_annotated_commit(local_branch.get())?;
+        let signature = get_signature(&pc)?;
+        repo.rebase(Some(&local_ref), Some(&remote_ref), None, None)?
+            .finish(Some(&signature))?;
+        info!("Rebased local branch onto `{}`.", remote_branch_name);
+    } else {
+        repo.branch_from_annotated_commit(&pc.config.remote.branch, &remote_ref, false)?;
+        info!("Created new local branch from `{}`.", remote_branch_name);
+    }
+
+    Ok(())
+}
+
+// ========================================
+// Utility
+// ========================================
+
+/// Generate a new signature at the current time.
+fn get_signature(pc: &PathConfig) -> Result<Signature> {
+    Ok(Signature::now(&pc.config.user.name, &pc.config.user.email)?)
+}
+
+/// Verify the repository we are working in supports the operations we want to
+/// apply to it.
+fn validate_repo(repo: &Repository) -> Result<()> {
+    repo.workdir().ok_or(Error::InvalidBareRepo)?;
+    Ok(())
+}
+
+/// Create or retrieve the remote specified within our configuration.
+///
+/// This method also configures the fetchspec for the remote, explicitly mapping
+/// the remote branch against our local one.
+///
+/// https://git-scm.com/book/en/v2/Git-Internals-The-Refspec
+fn get_remote<'repo>(pc: &PathConfig, repo: &'repo Repository) -> Result<Remote<'repo>> {
+    repo.remote_set_url(&pc.config.remote.name, &pc.config.remote.url.to_string())?;
+    repo.remote_add_fetch(
+        &pc.config.remote.name,
+        // We could go with "*" instead of {branch} for all remote branches.
+        &format!(
+            "+refs/heads/{branch}:refs/remotes/origin/{branch}",
+            branch = pc.config.remote.branch
+        ),
+    )?;
+    Ok(repo.find_remote(&pc.config.remote.name)?)
+}
+
+/// Finds the latest commit relative to HEAD.
+///
+/// You should probably switch branches (refer to `switch_branch`) before
+/// calling this function.
+fn get_head_commit(repo: &Repository) -> Result<Option<Commit>> {
+    match repo.head() {
+        Ok(head) => {
+            let obj = head
+                .resolve()?
+                .peel(ObjectType::Commit)?
+                .into_commit()
+                .map_err(|_| git2::Error::from_str("Couldn't find commit"))?;
+            Ok(Some(obj))
+        }
+        Err(e) => match e.code() {
+            git2::ErrorCode::UnbornBranch => Ok(None),
+            _ => Err(e)?,
+        },
+    }
 }
