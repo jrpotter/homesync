@@ -2,39 +2,35 @@
 user:
   name: jrpotter
   email: jrpotter@github.io
-local: $HOME/.homesync
-remote:
-  name: origin
-  branch: master
-  url: "https://github.com/jrpotter/home-config.git"
+ssh:
+  private: $HOME/.ssh/id_ed25519
+repos:
+  local: $HOME/.homesync
+  remote:
+    name: origin
+    branch: master
+    url: "git@github.com:jrpotter/home-config.git"
 packages:
   alacritty:
-    configs:
-      - $HOME/.alacritty.yml
-      - $HOME/.config/alacritty/alacritty.yml
-      - $XDG_CONFIG_HOME/alacritty.yml
-      - $XDG_CONFIG_HOME/alacritty/alacritty.yml
+    - $HOME/.alacritty.yml
+    - $HOME/.config/alacritty/alacritty.yml
+    - $XDG_CONFIG_HOME/alacritty.yml
+    - $XDG_CONFIG_HOME/alacritty/alacritty.yml
   bash:
-    configs:
-      - $HOME/.bash_profile
-      - $HOME/.bashrc
+    - $HOME/.bash_profile
+    - $HOME/.bashrc
   home-manager:
-    configs:
-      - $HOME/home.nix
+    - $HOME/home.nix
   homesync:
-    configs:
-      - $HOME/.homesync.yml
-      - $HOME/.config/homesync/homesync.yml
-      - $XDG_CONFIG_HOME/homesync.yml
-      - $XDG_CONFIG_HOME/homesync/homesync.yml
+    - $HOME/.homesync.yml
+    - $HOME/.config/homesync/homesync.yml
+    - $XDG_CONFIG_HOME/homesync.yml
+    - $XDG_CONFIG_HOME/homesync/homesync.yml
   neovim:
-    configs:
-      - $HOME/.config/nvim/init.vim
-      - $XDG_CONFIG_HOME/nvim/init.vim
+    - $HOME/.config/nvim/init.vim
+    - $XDG_CONFIG_HOME/nvim/init.vim
   termite:
-    configs:
-      - $HOME/.config/termite/config
-      - $XDG_CONFIG_HOME/termite/config
+    - $HOME/.config/termite/config
+    - $XDG_CONFIG_HOME/termite/config
   tmux:
-    configs:
-      - $HOME/.tmux.conf
+    - $HOME/.tmux.conf

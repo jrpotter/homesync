@@ -3,7 +3,6 @@ use paris::formatter::colorize_string;
 use serde_derive::{Deserialize, Serialize};
 use simplelog::{info, paris};
 use std::{collections::BTreeMap, env::VarError, error, fmt, fs, io, io::Write, path::PathBuf};
-use url::{ParseError, Url};
 
 // ========================================
 // Error
@@ -15,7 +14,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     IOError(io::Error),
     MissingConfig,
-    ParseError(ParseError),
     SerdeError(serde_yaml::Error),
     VarError(VarError),
 }
@@ -41,12 +39,6 @@ impl From<path::Error> for Error {
     }
 }
 
-impl From<ParseError> for Error {
-    fn from(err: ParseError) -> Error {
-        Error::ParseError(err)
-    }
-}
-
 impl From<VarError> for Error {
     fn from(err: VarError) -> Error {
         Error::VarError(err)
@@ -58,7 +50,6 @@ impl fmt::Display for Error {
         match self {
             Error::IOError(e) => write!(f, "{}", e),
             Error::MissingConfig => write!(f, "Could not find configuration file"),
-            Error::ParseError(e) => write!(f, "{}", e),
             Error::SerdeError(e) => write!(f, "{}", e),
             Error::VarError(e) => write!(f, "{}", e),
         }
@@ -78,23 +69,36 @@ pub struct User {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Package {
-    pub configs: Vec<PathBuf>,
+pub struct SSH {
+    pub public: Option<PathBuf>,
+    pub private: PathBuf,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Remote {
     pub name: String,
     pub branch: String,
-    pub url: Url,
+    pub url: String,
+}
+
+impl Remote {
+    pub fn tracking_branch(&self) -> String {
+        format!("{}/{}", &self.name, &self.branch)
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Repos {
+    pub local: PathBuf,
+    pub remote: Remote,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
     pub user: User,
-    pub local: PathBuf,
-    pub remote: Remote,
-    pub packages: BTreeMap<String, Package>,
+    pub ssh: SSH,
+    pub repos: Repos,
+    pub packages: BTreeMap<String, Vec<PathBuf>>,
 }
 
 impl Config {
@@ -160,7 +164,7 @@ pub fn load(candidates: &Vec<ResPathBuf>) -> Result<PathConfig> {
 pub fn reload(pc: &PathConfig) -> Result<PathConfig> {
     info!(
         "<green>{}</> configuration reloaded.",
-        pc.config.local.display()
+        pc.config.repos.local.display()
     );
     load(&vec![pc.homesync_yml.clone()])
 }

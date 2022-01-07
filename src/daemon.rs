@@ -123,8 +123,8 @@ impl<'a> WatchState<'a> {
             }
         }
         self.watching.clear();
-        for (_, package) in &pc.config.packages {
-            for path in &package.configs {
+        for (_, packages) in &pc.config.packages {
+            for path in packages {
                 match path::soft_resolve(&path) {
                     Ok(None) => self.send_poll(PollEvent::Pending(path.clone())),
                     Ok(Some(n)) => self.watch(n),
