@@ -2,13 +2,7 @@ use super::{path, path::ResPathBuf};
 use paris::formatter::colorize_string;
 use serde_derive::{Deserialize, Serialize};
 use simplelog::{info, paris};
-use std::{
-    collections::BTreeMap,
-    env::VarError,
-    error, fmt, fs, io,
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::{collections::BTreeMap, env::VarError, error, fmt, fs, io, io::Write, path::PathBuf};
 use url::{ParseError, Url};
 
 // ========================================
@@ -78,6 +72,12 @@ impl error::Error for Error {}
 // ========================================
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct User {
+    pub name: String,
+    pub email: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Package {
     pub configs: Vec<PathBuf>,
 }
@@ -91,6 +91,7 @@ pub struct Remote {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
+    pub user: User,
     pub local: PathBuf,
     pub remote: Remote,
     pub packages: BTreeMap<String, Package>,
@@ -162,97 +163,6 @@ pub fn reload(pc: &PathConfig) -> Result<PathConfig> {
         pc.config.local.display()
     );
     load(&vec![pc.homesync_yml.clone()])
-}
-
-// ========================================
-// Creation
-// ========================================
-
-fn prompt_default(prompt: &str, default: String) -> Result<String> {
-    print!("{}", prompt);
-    io::stdout().flush()?;
-    let mut value = String::new();
-    io::stdin().read_line(&mut value)?;
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        Ok(default)
-    } else {
-        Ok(trimmed.to_owned())
-    }
-}
-
-fn prompt_local(path: Option<&Path>) -> Result<PathBuf> {
-    let default = path.map_or("$HOME/.homesync".to_owned(), |p| p.display().to_string());
-    let value = prompt_default(
-        &format!(
-            "Local git repository <{}> (enter to continue): ",
-            colorize_string(format!("<yellow>{}</>", &default)),
-        ),
-        default,
-    )?;
-    Ok(PathBuf::from(value))
-}
-
-fn prompt_remote(remote: Option<&Remote>) -> Result<Remote> {
-    let default_name = remote.map_or("origin".to_owned(), |r| r.name.to_owned());
-    let remote_name = prompt_default(
-        &format!(
-            "Remote git name <{}> (enter to continue): ",
-            colorize_string(format!("<yellow>{}</>", &default_name))
-        ),
-        default_name,
-    )?;
-
-    let default_branch = remote.map_or("origin".to_owned(), |r| r.branch.to_owned());
-    let remote_branch = prompt_default(
-        &format!(
-            "Remote git branch <{}> (enter to continue): ",
-            colorize_string(format!("<yellow>{}</>", &default_branch))
-        ),
-        default_branch,
-    )?;
-
-    let default_url = remote.map_or("https://github.com/owner/repo.git".to_owned(), |r| {
-        r.url.to_string()
-    });
-    let remote_url = prompt_default(
-        &format!(
-            "Remote git url <{}> (enter to continue): ",
-            colorize_string(format!("<yellow>{}</>", &default_url))
-        ),
-        default_url,
-    )?;
-
-    Ok(Remote {
-        name: remote_name,
-        branch: remote_branch,
-        url: Url::parse(&remote_url)?,
-    })
-}
-
-pub fn write(path: &ResPathBuf, loaded: Option<Config>) -> Result<PathConfig> {
-    println!(
-        "Generating config at {}...\n",
-        colorize_string(format!("<green>{}</>", path.unresolved().display())),
-    );
-    let local = prompt_local(match &loaded {
-        Some(c) => Some(c.local.as_ref()),
-        None => None,
-    })?;
-    let remote = prompt_remote(match &loaded {
-        Some(c) => Some(&c.remote),
-        None => None,
-    })?;
-    let generated = PathConfig {
-        homesync_yml: path.clone(),
-        config: Config {
-            local,
-            remote,
-            packages: loaded.map_or(BTreeMap::new(), |c| c.packages),
-        },
-    };
-    generated.write()?;
-    Ok(generated)
 }
 
 // ========================================

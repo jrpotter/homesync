@@ -1,4 +1,7 @@
 ---
+user:
+  name: jrpotter
+  email: jrpotter@github.io
 local: $HOME/.homesync
 remote:
   name: origin

@@ -60,7 +60,6 @@ fn main() {
                         .default_value("5"),
                 ),
         )
-        .subcommand(App::new("init").about("Initialize the homesync local repository"))
         .subcommand(App::new("list").about("See which packages homesync manages"))
         .subcommand(App::new("push").about("Push changes from local to remote"))
         .get_matches();
@@ -72,34 +71,24 @@ fn main() {
 
 fn dispatch(matches: clap::ArgMatches) -> Result<(), Box<dyn Error>> {
     let candidates = find_candidates(&matches)?;
+    let config = homesync::config::load(&candidates)?;
     match matches.subcommand() {
-        Some(("init", _)) => Ok(homesync::run_init(candidates)?),
-        // All subcommands beside `init` require a config. If we invoke any of
-        // these, immediately attempt to load our config. Note once a config is
-        // loaded, this same config is used throughout the lifetime of the
-        // process. We avoid introducing the ability to "change" which config is
-        // used, even if one of higher priority is eventually defined.
-        subcommand => {
-            let config = homesync::config::load(&candidates)?;
-            match subcommand {
-                Some(("apply", _)) => Ok(homesync::run_apply(config)?),
-                Some(("daemon", matches)) => {
-                    let freq_secs: u64 = match matches.value_of("frequency") {
-                        Some(f) => f.parse().unwrap_or(0),
-                        None => 5,
-                    };
-                    if freq_secs > 0 {
-                        homesync::run_daemon(config, freq_secs)?;
-                    } else {
-                        error!("Invalid frequency. Expected a positive integer.");
-                    }
-                    Ok(())
-                }
-                Some(("list", _)) => Ok(homesync::run_list(config)?),
-                Some(("push", _)) => Ok(homesync::run_push(config)?),
-                _ => unreachable!(),
+        Some(("apply", _)) => Ok(homesync::run_apply(config)?),
+        Some(("daemon", matches)) => {
+            let freq_secs: u64 = match matches.value_of("frequency") {
+                Some(f) => f.parse().unwrap_or(0),
+                None => 5,
+            };
+            if freq_secs > 0 {
+                homesync::run_daemon(config, freq_secs)?;
+            } else {
+                error!("Invalid frequency. Expected a positive integer.");
             }
+            Ok(())
         }
+        Some(("list", _)) => Ok(homesync::run_list(config)?),
+        Some(("push", _)) => Ok(homesync::run_push(config)?),
+        _ => unreachable!(),
     }
 }
 

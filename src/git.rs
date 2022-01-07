@@ -1,5 +1,5 @@
 use super::{config::PathConfig, path};
-use git2::{IndexAddOption, ObjectType, Remote, Repository, Signature, StashFlags};
+use git2::{IndexAddOption, ObjectType, Remote, Repository, Signature};
 use path::ResPathBuf;
 use simplelog::{info, paris};
 use std::{
