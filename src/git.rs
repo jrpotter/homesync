@@ -132,7 +132,7 @@ pub fn init(pc: &PathConfig) -> Result<Repository> {
 }
 
 // ========================================
-// Application
+// Staging
 // ========================================
 
 fn find_repo_files(path: &Path) -> Result<Vec<ResPathBuf>> {
@@ -166,7 +166,7 @@ fn find_package_files(pc: &PathConfig) -> Vec<ResPathBuf> {
     seen
 }
 
-pub fn apply(pc: &PathConfig, repo: &Repository) -> Result<()> {
+pub fn stage(pc: &PathConfig, repo: &Repository) -> Result<()> {
     let workdir = repo.workdir().ok_or(Error::NotWorkingRepo)?;
     let repo_files = find_repo_files(&workdir)?;
     let package_files = find_package_files(&pc);

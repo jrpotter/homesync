@@ -25,45 +25,69 @@ Locations are searched in the following priority:
 - `$XDG_CONFIG_HOME/homesync.yml`
 - `$XDG_CONFIG_HOME/homesync/homesync.yml`
 
-That said, it is recommended to modify this config solely from the exposed
-homesync CLI. Homesync will take responsibility ensuring the generated
-configuration is according to package manager, platform, etc.
+The config file should look like the following:
+
+```yaml
+---
+user:
+  name: jrpotter
+  email: jrpotter@github.io
+local: $HOME/.homesync
+remote:
+  name: origin
+  branch: master
+  url: "https://github.com/jrpotter/home-config.git"
+packages:
+  homesync:
+    configs:
+      - $HOME/.homesync.yml
+      - $HOME/.config/homesync/homesync.yml
+      - $XDG_CONFIG_HOME/homesync.yml
+      - $XDG_CONFIG_HOME/homesync/homesync.yml
+  ...
+```
+
+Copy over [examples/template.yaml](https://github.com/jrpotter/homesync/blob/main/examples/template.yaml)
+to where you'd like as a starting point.
 
 ## Usage
 
-Verify your installation by running `homesync` from the command line. If
-installed, you will likely want to initialize a new config instance. Do so by
-typing:
+Verify your installation by running `homesync` from the command line. To have
+your local repository match the remote, run
 
 ```bash
-$ homesync init
+$ homesync pull
 ```
 
-You can then walk through what github repository you want to sync your various
-files with. You can have homesync automatically monitor all configuration files
-and post updates on changes by running
+If you make a change to a configuration tracked by homesync, you can tell
+homesync to prep pushing those changes via the `stage` subcommand or rely on
+the daemon service to do it for you:
 
 ```bash
-$ homesync daemon
+$ homesync stage
+$ homesync daemon &
 ```
 
-As changes are made to your `homesync` config or any configuration files
-referred to within the `homesync` config, the daemon service will sync the
-changes to the local git repository. To push these changes upward, run
+Homesync will find all tracked files that have changed and stage them in the
+local repository. You can then push those changes using
 
 ```bash
-$ homesync push --all
+$ homesync push
 ```
 
-which will expose a git interface for you to complete the push. Lastly, to sync
-the remote configurations to your local files, run
+If looking to copy a configuration tracked by homesync to your desktop, you
+can run
 
 ```bash
-$ homesync pull --all
+$ homesync apply <filename>
 ```
 
-This will load up a diff wrapper for you to ensure you make the changes you'd
-like.
+To copy all configurations (and optionally overwrite files that already exist),
+you can run
+
+```bash
+$ homesync apply --all [--overwrite]
+```
 
 ## Known Issues
 

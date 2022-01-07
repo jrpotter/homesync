@@ -39,9 +39,6 @@ fn main() {
                 .takes_value(true),
         )
         .subcommand(
-            App::new("apply").about("Find all changes and apply them to the local repository"),
-        )
-        .subcommand(
             App::new("daemon")
                 .about("Start up a new homesync daemon")
                 .arg(
@@ -62,6 +59,9 @@ fn main() {
         )
         .subcommand(App::new("list").about("See which packages homesync manages"))
         .subcommand(App::new("push").about("Push changes from local to remote"))
+        .subcommand(
+            App::new("stage").about("Find all changes and stage them onto the local repository"),
+        )
         .get_matches();
 
     if let Err(e) = dispatch(matches) {
@@ -73,7 +73,6 @@ fn dispatch(matches: clap::ArgMatches) -> Result<(), Box<dyn Error>> {
     let candidates = find_candidates(&matches)?;
     let config = homesync::config::load(&candidates)?;
     match matches.subcommand() {
-        Some(("apply", _)) => Ok(homesync::run_apply(config)?),
         Some(("daemon", matches)) => {
             let freq_secs: u64 = match matches.value_of("frequency") {
                 Some(f) => f.parse().unwrap_or(0),
@@ -88,6 +87,7 @@ fn dispatch(matches: clap::ArgMatches) -> Result<(), Box<dyn Error>> {
         }
         Some(("list", _)) => Ok(homesync::run_list(config)?),
         Some(("push", _)) => Ok(homesync::run_push(config)?),
+        Some(("stage", _)) => Ok(homesync::run_stage(config)?),
         _ => unreachable!(),
     }
 }

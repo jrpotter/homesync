@@ -1,0 +1,16 @@
+---
+user:
+  name: name
+  email: email@email.com
+local: $HOME/.homesync
+remote:
+  name: origin
+  branch: master
+  url: "https://github.com/owner/repo.git"
+packages:
+  homesync:
+    configs:
+      - $HOME/.homesync.yml
+      - $HOME/.config/homesync/homesync.yml
+      - $XDG_CONFIG_HOME/homesync.yml
+      - $XDG_CONFIG_HOME/homesync/homesync.yml

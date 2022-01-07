@@ -157,7 +157,7 @@ pub fn launch(mut pc: PathConfig, repo: Repository, freq_secs: u64) -> Result<()
     let mut state = WatchState::new(poll_tx, &mut watcher)?;
     state.update(&pc);
     loop {
-        git::apply(&pc, &repo)?;
+        git::stage(&pc, &repo)?;
         // Received paths should always be fully resolved.
         match watch_rx.recv() {
             Ok(DebouncedEvent::NoticeWrite(p)) => {

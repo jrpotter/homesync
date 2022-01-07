@@ -8,12 +8,6 @@ use std::error::Error;
 
 type Result = std::result::Result<(), Box<dyn Error>>;
 
-pub fn run_apply(config: PathConfig) -> Result {
-    let repo = git::init(&config)?;
-    git::apply(&config, &repo)?;
-    Ok(())
-}
-
 pub fn run_daemon(config: PathConfig, freq_secs: u64) -> Result {
     let repo = git::init(&config)?;
     daemon::launch(config, repo, freq_secs)?;
@@ -28,5 +22,11 @@ pub fn run_list(config: PathConfig) -> Result {
 pub fn run_push(config: PathConfig) -> Result {
     let mut repo = git::init(&config)?;
     git::push(&config, &mut repo)?;
+    Ok(())
+}
+
+pub fn run_stage(config: PathConfig) -> Result {
+    let repo = git::init(&config)?;
+    git::stage(&config, &repo)?;
     Ok(())
 }
