@@ -39,6 +39,25 @@ fn main() {
                 .takes_value(true),
         )
         .subcommand(
+            App::new("apply")
+                .about("Copy files from local repository to rest of desktop")
+                .arg(
+                    Arg::new("file")
+                        .value_name("FILE")
+                        .conflicts_with("all")
+                        .required_unless_present("all")
+                        .help("The file we want to overwrite from the local repository")
+                        .takes_value(true),
+                )
+                .arg(
+                    Arg::new("all")
+                        .long("all")
+                        .conflicts_with("file")
+                        .help("Indicates we want to copy all files from the local repository")
+                        .takes_value(false),
+                ),
+        )
+        .subcommand(
             App::new("daemon")
                 .about("Start up a new homesync daemon")
                 .arg(
@@ -74,6 +93,7 @@ fn dispatch(matches: clap::ArgMatches) -> Result<(), Box<dyn Error>> {
     let candidates = find_candidates(&matches)?;
     let config = homesync::config::load(&candidates)?;
     match matches.subcommand() {
+        Some(("apply", matches)) => Ok(homesync::run_apply(config, matches.value_of("file"))?),
         Some(("daemon", matches)) => {
             let freq_secs: u64 = match matches.value_of("frequency") {
                 Some(f) => f.parse().unwrap_or(0),

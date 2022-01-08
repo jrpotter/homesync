@@ -1,5 +1,4 @@
-use super::{config, config::PathConfig, git, path, path::ResPathBuf};
-use git2::Repository;
+use super::{config, config::PathConfig, copy, path, path::ResPathBuf};
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use simplelog::{error, paris, trace, warn};
 use std::{
@@ -139,7 +138,7 @@ impl<'a> WatchState<'a> {
 // Daemon
 // ========================================
 
-pub fn launch(mut pc: PathConfig, repo: Repository, freq_secs: u64) -> Result<(), Box<dyn Error>> {
+pub fn launch(mut pc: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Error>> {
     let (poll_tx, poll_rx) = channel();
     let (watch_tx, watch_rx) = channel();
     let watch_tx1 = watch_tx.clone();
@@ -157,7 +156,7 @@ pub fn launch(mut pc: PathConfig, repo: Repository, freq_secs: u64) -> Result<()
     let mut state = WatchState::new(poll_tx, &mut watcher)?;
     state.update(&pc);
     loop {
-        git::stage(&pc, &repo)?;
+        copy::stage(&pc)?;
         // Received paths should always be fully resolved.
         match watch_rx.recv() {
             Ok(DebouncedEvent::NoticeWrite(p)) => {

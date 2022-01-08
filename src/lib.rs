@@ -1,4 +1,5 @@
 pub mod config;
+pub mod copy;
 pub mod daemon;
 pub mod git;
 pub mod path;
@@ -8,9 +9,13 @@ use std::error::Error;
 
 type Result = std::result::Result<(), Box<dyn Error>>;
 
+pub fn run_apply(config: PathConfig, file: Option<&str>) -> Result {
+    copy::apply(&config, file)?;
+    Ok(())
+}
+
 pub fn run_daemon(config: PathConfig, freq_secs: u64) -> Result {
-    let repo = git::init(&config)?;
-    daemon::launch(config, repo, freq_secs)?;
+    daemon::launch(config, freq_secs)?;
     Ok(())
 }
 
@@ -32,7 +37,6 @@ pub fn run_pull(config: PathConfig) -> Result {
 }
 
 pub fn run_stage(config: PathConfig) -> Result {
-    let repo = git::init(&config)?;
-    git::stage(&config, &repo)?;
+    copy::stage(&config)?;
     Ok(())
 }

@@ -4,12 +4,11 @@ use git2::{
     ObjectType, PushOptions, Remote, RemoteCallbacks, Repository, Signature, StashApplyOptions,
     StashFlags,
 };
-use path::ResPathBuf;
 use simplelog::{info, paris, warn};
 use std::{
     collections::HashSet,
     env::VarError,
-    error, fmt, fs, io,
+    error, fmt, io,
     path::{Path, PathBuf},
     result,
 };
@@ -133,87 +132,6 @@ pub fn init(pc: &PathConfig) -> Result<Repository> {
         },
         Err(e) => Err(e)?,
     }
-}
-
-// ========================================
-// Staging
-// ========================================
-
-fn find_repo_files(path: &Path) -> Result<Vec<ResPathBuf>> {
-    let mut seen = Vec::new();
-    if path.is_dir() {
-        for entry in fs::read_dir(path)? {
-            let nested = entry?.path();
-            if nested.is_dir() {
-                if nested.ends_with(".git") {
-                    continue;
-                }
-                let nested = find_repo_files(&nested)?;
-                seen.extend_from_slice(&nested);
-            } else if !nested.ends_with(".homesync") {
-                seen.push(ResPathBuf::new(&nested)?);
-            }
-        }
-    }
-    Ok(seen)
-}
-
-fn find_package_files(pc: &PathConfig) -> Vec<ResPathBuf> {
-    let mut seen = Vec::new();
-    for (_, packages) in &pc.config.packages {
-        for path in packages {
-            if let Ok(resolved) = path::resolve(path) {
-                seen.push(resolved);
-            }
-        }
-    }
-    seen
-}
-
-pub fn stage(pc: &PathConfig, repo: &Repository) -> Result<()> {
-    let workdir = check_working_repo(repo)?;
-    let repo_files = find_repo_files(&workdir)?;
-    let package_files = find_package_files(pc);
-
-    // Find all files in our repository that are no longer being referenced in
-    // our primary config file. They should be removed from the repository.
-    let lookup_files: HashSet<PathBuf> = package_files
-        .iter()
-        .map(|m| m.unresolved().to_path_buf())
-        .collect();
-    for repo_file in &repo_files {
-        let relative = repo_file
-            .resolved()
-            .strip_prefix(&workdir)
-            .expect("Relative git file could not be stripped properly.")
-            .to_path_buf();
-        if !lookup_files.contains(&relative) {
-            fs::remove_file(repo_file)?;
-        }
-        if let Some(p) = repo_file.resolved().parent() {
-            if p.read_dir()?.next().is_none() {
-                fs::remove_dir(p)?;
-            }
-        }
-    }
-
-    // Find all resolvable files in our primary config and copy them into the
-    // repository.
-    for package_file in &package_files {
-        let mut copy = workdir.to_path_buf();
-        copy.push(package_file.unresolved());
-        if let Some(p) = copy.parent() {
-            fs::create_dir_all(p)?;
-        }
-        fs::copy(package_file.resolved(), copy)?;
-    }
-
-    info!(
-        "Staged files. Run <italic>git -C <green>{}</> <italic>status</> to see what changed.",
-        &pc.config.repos.local.display()
-    );
-
-    Ok(())
 }
 
 // ========================================
