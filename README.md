@@ -30,21 +30,23 @@ The config file should look like the following:
 ```yaml
 ---
 user:
-  name: jrpotter
-  email: jrpotter@github.io
-local: $HOME/.homesync
-remote:
-  name: origin
-  branch: master
-  url: "https://github.com/jrpotter/home-config.git"
+  name: name
+  email: email@email.com
+ssh:
+  public: $HOME/.ssh/id_ed25519.pub
+  private: $HOME/.ssh/id_ed25519
+repos:
+  local: $HOME/.homesync
+  remote:
+    name: origin
+    branch: master
+    url: "https://github.com/owner/repo.git"
 packages:
   homesync:
-    configs:
-      - $HOME/.homesync.yml
-      - $HOME/.config/homesync/homesync.yml
-      - $XDG_CONFIG_HOME/homesync.yml
-      - $XDG_CONFIG_HOME/homesync/homesync.yml
-  ...
+    - $HOME/.homesync.yml
+    - $HOME/.config/homesync/homesync.yml
+    - $XDG_CONFIG_HOME/homesync.yml
+    - $XDG_CONFIG_HOME/homesync/homesync.yml
 ```
 
 Copy over [examples/template.yaml](https://github.com/jrpotter/homesync/blob/main/examples/template.yaml)
