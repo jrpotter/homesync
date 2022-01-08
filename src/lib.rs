@@ -9,8 +9,8 @@ use std::error::Error;
 
 type Result = std::result::Result<(), Box<dyn Error>>;
 
-pub fn run_apply(config: PathConfig, file: Option<&str>) -> Result {
-    copy::apply(&config, file)?;
+pub fn run_apply(config: PathConfig, package: Option<&str>) -> Result {
+    copy::apply(&config, package)?;
     Ok(())
 }
 

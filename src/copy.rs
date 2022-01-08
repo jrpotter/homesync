@@ -1,5 +1,5 @@
 use super::{config::PathConfig, path, path::ResPathBuf};
-use simplelog::{info, paris};
+use simplelog::{info, paris, warn};
 use std::{
     collections::HashMap,
     env::VarError,
@@ -58,15 +58,32 @@ impl error::Error for Error {}
 
 fn apply_all(pc: &PathConfig) -> Result<()> {
     let workdir = path::resolve(&pc.config.repos.local)?;
-    let repo_lookup = get_repo_lookup(workdir.as_ref(), workdir.as_ref())?;
+    let repo_files = walk_repo(workdir.as_ref())?;
     let package_lookup = get_package_lookup(pc);
 
-    for (repo_unresolved, repo_resolved) in &repo_lookup {
-        if let Some(package_resolved) = package_lookup.get(repo_unresolved) {
-            fs::copy(repo_resolved, package_resolved)?;
+    for repo_file in &repo_files {
+        let path = match package_lookup.get(repo_file.unresolved()) {
+            Some(value) => value,
+            None => continue,
+        };
+        if let Some(value) = path {
+            fs::copy(repo_file.resolved(), value.resolved())?;
             info!(
                 "Copied `{}` from local repository.",
-                repo_unresolved.display(),
+                repo_file.unresolved().display(),
+            );
+        } else {
+            let expanded = match path::expand(repo_file.unresolved()) {
+                Ok(expanded) => expanded,
+                Err(_) => continue,
+            };
+            if let Some(p) = expanded.parent() {
+                fs::create_dir_all(p)?;
+            }
+            fs::copy(repo_file.resolved(), expanded)?;
+            info!(
+                "Copied `{}` from local repository.",
+                repo_file.unresolved().display(),
             );
         }
     }
@@ -74,25 +91,36 @@ fn apply_all(pc: &PathConfig) -> Result<()> {
     Ok(())
 }
 
-fn apply_one(pc: &PathConfig, target: &Path) -> Result<()> {
+fn apply_one(pc: &PathConfig, package: &str) -> Result<()> {
     let workdir = path::resolve(&pc.config.repos.local)?;
-    let repo_lookup = get_repo_lookup(workdir.as_ref(), workdir.as_ref())?;
-    let package_lookup = get_package_lookup(pc);
 
-    // The user must specify a path that matches the unresolved one.
-    if let Some(repo_resolved) = repo_lookup.get(target) {
-        if let Some(package_resolved) = package_lookup.get(target) {
-            fs::copy(repo_resolved, package_resolved)?;
-            info!("Copied `{}` from local repository.", target.display(),);
+    if let Some(paths) = pc.config.packages.get(package) {
+        for path in paths {
+            let mut repo_file = workdir.resolved().to_path_buf();
+            repo_file.push(path);
+            if !repo_file.exists() {
+                continue;
+            }
+            let expanded = match path::expand(path) {
+                Ok(expanded) => expanded,
+                Err(_) => continue,
+            };
+            if let Some(p) = expanded.parent() {
+                fs::create_dir_all(p)?;
+            }
+            fs::copy(repo_file, expanded)?;
+            info!("Copied `{}` from local repository.", path.display());
         }
+    } else {
+        warn!("Could not find package `{}` in config.", package);
     }
 
     Ok(())
 }
 
-pub fn apply(pc: &PathConfig, file: Option<&str>) -> Result<()> {
-    if let Some(file) = file {
-        apply_one(pc, Path::new(file))
+pub fn apply(pc: &PathConfig, package: Option<&str>) -> Result<()> {
+    if let Some(package) = package {
+        apply_one(pc, package)
     } else {
         apply_all(pc)
     }
@@ -104,16 +132,16 @@ pub fn apply(pc: &PathConfig, file: Option<&str>) -> Result<()> {
 
 pub fn stage(pc: &PathConfig) -> Result<()> {
     let workdir = path::resolve(&pc.config.repos.local)?;
-    let repo_lookup = get_repo_lookup(workdir.as_ref(), workdir.as_ref())?;
+    let repo_files = walk_repo(workdir.as_ref())?;
     let package_lookup = get_package_lookup(pc);
 
     // Find all files in our repository that are no longer being referenced in
     // our primary config file. They should be removed from the repository.
-    for (repo_unresolved, repo_resolved) in &repo_lookup {
-        if !package_lookup.contains_key(repo_unresolved) {
-            fs::remove_file(repo_resolved)?;
+    for repo_file in &repo_files {
+        if !package_lookup.contains_key(repo_file.unresolved()) {
+            fs::remove_file(repo_file.resolved())?;
         }
-        if let Some(p) = repo_resolved.resolved().parent() {
+        if let Some(p) = repo_file.resolved().parent() {
             if p.read_dir()?.next().is_none() {
                 fs::remove_dir(p)?;
             }
@@ -122,13 +150,15 @@ pub fn stage(pc: &PathConfig) -> Result<()> {
 
     // Find all resolvable files in our primary config and copy them into the
     // repository.
-    for (package_unresolved, package_resolved) in &package_lookup {
-        let mut copy = package_resolved.resolved().to_path_buf();
-        copy.push(package_unresolved);
-        if let Some(p) = copy.parent() {
-            fs::create_dir_all(p)?;
+    for (key, value) in &package_lookup {
+        if let Some(value) = value {
+            let mut copy = value.resolved().to_path_buf();
+            copy.push(key);
+            if let Some(p) = copy.parent() {
+                fs::create_dir_all(p)?;
+            }
+            fs::copy(value.resolved(), copy)?;
         }
-        fs::copy(package_resolved.resolved(), copy)?;
     }
 
     info!(
@@ -143,8 +173,8 @@ pub fn stage(pc: &PathConfig) -> Result<()> {
 // Utility
 // ========================================
 
-fn get_repo_lookup(root: &Path, path: &Path) -> Result<HashMap<PathBuf, ResPathBuf>> {
-    let mut seen = HashMap::new();
+fn recursive_walk_repo(root: &Path, path: &Path) -> Result<Vec<ResPathBuf>> {
+    let mut seen = Vec::new();
     if path.is_dir() {
         for entry in fs::read_dir(path)? {
             let nested = entry?.path();
@@ -152,26 +182,31 @@ fn get_repo_lookup(root: &Path, path: &Path) -> Result<HashMap<PathBuf, ResPathB
                 if nested.ends_with(".git") {
                     continue;
                 }
-                let nested = get_repo_lookup(root, &nested)?;
-                seen.extend(nested);
+                let nested = recursive_walk_repo(root, &nested)?;
+                seen.extend_from_slice(&nested);
             } else {
                 let relative = nested
                     .strip_prefix(root)
-                    .expect("Relative git file could not be stripped properly.")
-                    .to_path_buf();
-                seen.insert(relative, ResPathBuf::new(&nested)?);
+                    .expect("Relative git file could not be stripped properly.");
+                seen.push(ResPathBuf::new(&nested, relative)?);
             }
         }
     }
     Ok(seen)
 }
 
-fn get_package_lookup(pc: &PathConfig) -> HashMap<PathBuf, ResPathBuf> {
+fn walk_repo(root: &Path) -> Result<Vec<ResPathBuf>> {
+    recursive_walk_repo(root, root)
+}
+
+fn get_package_lookup(pc: &PathConfig) -> HashMap<PathBuf, Option<ResPathBuf>> {
     let mut seen = HashMap::new();
     for (_, packages) in &pc.config.packages {
         for path in packages {
             if let Ok(resolved) = path::resolve(path) {
-                seen.insert(path.to_path_buf(), resolved);
+                seen.insert(path.to_path_buf(), Some(resolved));
+            } else {
+                seen.insert(path.to_path_buf(), None);
             }
         }
     }

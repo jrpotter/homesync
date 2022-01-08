@@ -1,8 +1,10 @@
 use clap::{App, AppSettings, Arg};
 use homesync::path::ResPathBuf;
-use simplelog;
-use simplelog::{error, paris};
 use std::{error::Error, io, path::PathBuf};
+use {
+    simplelog,
+    simplelog::{error, paris},
+};
 
 #[cfg(debug_assertions)]
 fn log_level() -> simplelog::LevelFilter {
@@ -42,18 +44,18 @@ fn main() {
             App::new("apply")
                 .about("Copy files from local repository to rest of desktop")
                 .arg(
-                    Arg::new("file")
-                        .value_name("FILE")
+                    Arg::new("package")
+                        .value_name("PACKAGE")
                         .conflicts_with("all")
                         .required_unless_present("all")
-                        .help("The file we want to overwrite from the local repository")
+                        .help("The package we want to configure from the local repository")
                         .takes_value(true),
                 )
                 .arg(
                     Arg::new("all")
                         .long("all")
-                        .conflicts_with("file")
-                        .help("Indicates we want to copy all files from the local repository")
+                        .conflicts_with("package")
+                        .help("Indicates we want to copy all configurations from the local repository")
                         .takes_value(false),
                 ),
         )
@@ -93,7 +95,7 @@ fn dispatch(matches: clap::ArgMatches) -> Result<(), Box<dyn Error>> {
     let candidates = find_candidates(&matches)?;
     let config = homesync::config::load(&candidates)?;
     match matches.subcommand() {
-        Some(("apply", matches)) => Ok(homesync::run_apply(config, matches.value_of("file"))?),
+        Some(("apply", matches)) => Ok(homesync::run_apply(config, matches.value_of("package"))?),
         Some(("daemon", matches)) => {
             let freq_secs: u64 = match matches.value_of("frequency") {
                 Some(f) => f.parse().unwrap_or(0),

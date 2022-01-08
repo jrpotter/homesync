@@ -68,13 +68,13 @@ fn unresolved_error(path: &Path) -> io::Error {
 }
 
 impl ResPathBuf {
-    pub fn new(path: &Path) -> Result<Self> {
-        if !path.is_absolute() {
-            Err(unresolved_error(path))?;
+    pub fn new(inner: &Path, unresolved: &Path) -> Result<Self> {
+        if !inner.is_absolute() {
+            Err(unresolved_error(inner))?;
         }
         Ok(ResPathBuf {
-            inner: path.to_path_buf(),
-            unresolved: path.to_path_buf(),
+            inner: inner.to_path_buf(),
+            unresolved: unresolved.to_path_buf(),
         })
     }
 
