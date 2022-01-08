@@ -163,7 +163,7 @@ pub fn load(candidates: &Vec<ResPathBuf>) -> Result<PathConfig> {
 
 pub fn reload(pc: &PathConfig) -> Result<PathConfig> {
     info!(
-        "<green>{}</> configuration reloaded.",
+        "<bold>Reloaded:</> Configuration <cyan>{}</>.",
         pc.config.repos.local.display()
     );
     load(&vec![pc.homesync_yml.clone()])
@@ -177,7 +177,7 @@ pub fn list_packages(pc: PathConfig) {
     println!(
         "Listing packages in {}...\n",
         colorize_string(format!(
-            "<green>{}</>",
+            "<cyan>{}</>",
             pc.homesync_yml.unresolved().display()
         )),
     );

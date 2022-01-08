@@ -8,6 +8,8 @@ use std::{
     result,
 };
 
+// TODO(jrpotter): Validate local path is a git repository.
+
 // ========================================
 // Error
 // ========================================
@@ -69,7 +71,7 @@ fn apply_all(pc: &PathConfig) -> Result<()> {
         if let Some(value) = path {
             fs::copy(repo_file.resolved(), value.resolved())?;
             info!(
-                "Copied `{}` from local repository.",
+                "<bold>Copied:</> <cyan>{}</> from local repository.",
                 repo_file.unresolved().display(),
             );
         } else {
@@ -82,7 +84,7 @@ fn apply_all(pc: &PathConfig) -> Result<()> {
             }
             fs::copy(repo_file.resolved(), expanded)?;
             info!(
-                "Copied `{}` from local repository.",
+                "<bold>Copied:</> <cyan>{}</> from local repository.",
                 repo_file.unresolved().display(),
             );
         }
@@ -109,10 +111,13 @@ fn apply_one(pc: &PathConfig, package: &str) -> Result<()> {
                 fs::create_dir_all(p)?;
             }
             fs::copy(repo_file, expanded)?;
-            info!("Copied `{}` from local repository.", path.display());
+            info!(
+                "<bold>Copied:</> <cyan>{}</> from local repository.",
+                path.display()
+            );
         }
     } else {
-        warn!("Could not find package `{}` in config.", package);
+        warn!("Could not find package <cyan>{}</> in config.", package);
     }
 
     Ok(())
@@ -152,7 +157,7 @@ pub fn stage(pc: &PathConfig) -> Result<()> {
     // repository.
     for (key, value) in &package_lookup {
         if let Some(value) = value {
-            let mut copy = value.resolved().to_path_buf();
+            let mut copy = workdir.resolved().to_path_buf();
             copy.push(key);
             if let Some(p) = copy.parent() {
                 fs::create_dir_all(p)?;
@@ -162,7 +167,7 @@ pub fn stage(pc: &PathConfig) -> Result<()> {
     }
 
     info!(
-        "Staged files. Run <italic>git -C <green>{}</> <italic>status</> to see what changed.",
+        "<bold>Staged:</> View using `<italic>git -C <cyan>{}</> <italic>status</>`.",
         &pc.config.repos.local.display()
     );
 

@@ -160,20 +160,20 @@ pub fn launch(mut pc: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Error>> 
         // Received paths should always be fully resolved.
         match watch_rx.recv() {
             Ok(DebouncedEvent::NoticeWrite(p)) => {
-                trace!("NoticeWrite '{}'", p.display());
+                trace!("<bold>Noticed:</> Write at <cyan>{}</>", p.display());
             }
             Ok(DebouncedEvent::NoticeRemove(p)) => {
-                trace!("NoticeRemove '{}'", p.display());
+                trace!("<bold>Noticed:</> Removal of <cyan>{}</>", p.display());
             }
             Ok(DebouncedEvent::Create(p)) => {
-                trace!("Create '{}'", p.display());
+                trace!("<bold>Created:</> <cyan>{}</>", p.display());
                 if pc.homesync_yml == p {
                     pc = config::reload(&pc)?;
                     state.update(&pc);
                 }
             }
             Ok(DebouncedEvent::Write(p)) => {
-                trace!("Write '{}'", p.display());
+                trace!("<bold>Wrote:</> <cyan>{}</>", p.display());
                 if pc.homesync_yml == p {
                     pc = config::reload(&pc)?;
                     state.update(&pc);
@@ -184,26 +184,32 @@ pub fn launch(mut pc: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Error>> 
             // e.g. been removed, let's just keep using what we have in memory
             // in the chance it may be added back.
             Ok(DebouncedEvent::Chmod(p)) => {
-                trace!("Chmod '{}'", p.display());
+                trace!("<bold>Chmod:</> <cyan>{}</>", p.display());
             }
             Ok(DebouncedEvent::Remove(p)) => {
                 if pc.homesync_yml == p {
                     warn!(
-                        "Removed primary config '{}'. Continuing to use last loaded state",
+                        "<bold>Removed:</> Primary config <cyan>{}</>. Continuing to use last \
+                        loaded state",
                         p.display()
                     );
                 } else {
-                    trace!("Remove '{}'", p.display());
+                    trace!("<bold>Removed:</> <cyan>{}</>", p.display());
                 }
             }
             Ok(DebouncedEvent::Rename(src, dst)) => {
                 if pc.homesync_yml == src && pc.homesync_yml != dst {
                     warn!(
-                        "Renamed primary config '{}'. Continuing to use last loaded state",
+                        "<bold>Renamed:</> Primary config <cyan>{}</>. Continuing from last \
+                        loaded state",
                         src.display()
                     );
                 } else {
-                    trace!("Renamed '{}' to '{}'", src.display(), dst.display())
+                    trace!(
+                        "<bold>Renamed:</> <cyan>{}</> to <cyan>{}</>.",
+                        src.display(),
+                        dst.display()
+                    )
                 }
             }
             Ok(DebouncedEvent::Rescan) => {
@@ -211,7 +217,7 @@ pub fn launch(mut pc: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Error>> 
             }
             Ok(DebouncedEvent::Error(e, path)) => {
                 warn!(
-                    "Error {} at '{}'",
+                    "<bold>Unexpected:</> Error {} at <cyan>{}</>",
                     e,
                     path.unwrap_or_else(|| PathBuf::from("N/A")).display()
                 );

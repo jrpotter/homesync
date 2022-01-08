@@ -106,7 +106,7 @@ pub fn init(pc: &PathConfig) -> Result<Repository> {
     match Repository::open(&expanded) {
         Ok(repo) => {
             info!(
-                "Opened local repository <green>{}</>.",
+                "<bold>Opened:</> Local repository <cyan>{}</>.",
                 &pc.config.repos.local.display()
             );
             Ok(repo)
@@ -114,7 +114,7 @@ pub fn init(pc: &PathConfig) -> Result<Repository> {
         Err(e) if e.code() == git2::ErrorCode::NotFound => match clone(pc, &expanded) {
             Ok(repo) => {
                 info!(
-                    "Cloned remote repository <green>{}</>.",
+                    "<bold>Cloned:</> Remote repository <cyan>{}</>.",
                     &pc.config.repos.remote.url
                 );
                 Ok(repo)
@@ -122,11 +122,12 @@ pub fn init(pc: &PathConfig) -> Result<Repository> {
             Err(Error::GitError(e))
                 if e.class() == git2::ErrorClass::Ssh && e.code() == git2::ErrorCode::Eof =>
             {
+                let repo = Repository::init(&expanded)?;
                 info!(
-                    "Creating local repository at <green>{}</>.",
+                    "<bold>Created:</> Local repository <cyan>{}</>.",
                     pc.config.repos.local.display()
                 );
-                Ok(Repository::init(&expanded)?)
+                Ok(repo)
             }
             Err(e) => Err(e)?,
         },
@@ -161,7 +162,7 @@ pub fn push(pc: &PathConfig, repo: &mut Repository) -> Result<()> {
     // Want to also reflect this change on the working directory.
     index.write()?;
     let index_tree = repo.find_tree(index_oid)?;
-    info!("Writing index to tree `{}`.", index_oid);
+    info!("<bold>Wrote:</> Index to tree <cyan>{}</>.", index_oid);
 
     // Commit our changes and push them to our remote.
     // TODO(jrpotter): Come up with a more useful message.
@@ -186,7 +187,7 @@ pub fn push(pc: &PathConfig, repo: &mut Repository) -> Result<()> {
             &[],
         )?
     };
-    info!("Commited `{}` with message \"{}\".", commit_oid, message);
+    info!("<bold>Commited:</> <cyan>{}</>.", commit_oid);
 
     let mut remote = find_remote(pc, repo)?;
     let call_options = get_remote_callbacks(pc)?;
@@ -195,7 +196,7 @@ pub fn push(pc: &PathConfig, repo: &mut Repository) -> Result<()> {
     let mut push_options = get_push_options(pc)?;
     remote.push(&[&format!("{r}:{r}", r = refspec)], Some(&mut push_options))?;
     info!(
-        "Pushed changes to remote `{}`.",
+        "<bold>Pushed:</> Changes to remote <cyan>{}</>.",
         pc.config.repos.remote.tracking_branch(),
     );
 
@@ -212,7 +213,10 @@ fn local_from_remote(pc: &PathConfig, repo: &Repository) -> Result<()> {
     // It should never be the case this function is called when the local branch
     // exists. Keep `force` to `false` to catch any misuse here.
     repo.branch_from_annotated_commit(&pc.config.repos.remote.branch, &remote_ref, false)?;
-    info!("Created new local branch from `{}`.", &tracking_branch);
+    info!(
+        "<bold>Created</>: Local branch <cyan>{}</>.",
+        &pc.config.repos.remote.branch
+    );
 
     Ok(())
 }
@@ -233,7 +237,10 @@ fn local_rebase_remote(pc: &PathConfig, repo: &Repository) -> Result<()> {
     let signature = now_signature(pc)?;
     repo.rebase(Some(&local_ref), Some(&remote_ref), None, None)?
         .finish(Some(&signature))?;
-    info!("Rebased local branch onto `{}`.", &tracking_branch);
+    info!(
+        "<bold>Rebased:</> Local branch onto <cyan>{}<cyan>.",
+        &tracking_branch
+    );
 
     Ok(())
 }
@@ -267,7 +274,7 @@ pub fn pull(pc: &PathConfig, repo: &mut Repository) -> Result<()> {
     if let Some(mut index) = index_with_all(repo)? {
         let index_oid = index.write_tree()?;
         let index_tree = repo.find_tree(index_oid)?;
-        info!("Writing tree `{}`.", index_oid);
+        info!("<bold>Wrote:</> Index to tree <cyan>{}</>.", index_oid);
 
         let signature = now_signature(pc)?;
         let message = "Save potentially conflicting files here.";
@@ -283,7 +290,7 @@ pub fn pull(pc: &PathConfig, repo: &mut Repository) -> Result<()> {
                 &index_tree,
                 &[&parent_commit],
             )?;
-            info!("Saved potentially conflicting files in new commit of HEAD.");
+            info!("<bold>Saved:</> Potentially conflicting files in new commit of <cyan>HEAD</>.");
         } else {
             let temp_branch = temporary_branch_name(pc, repo)?;
             let refspec = format!("refs/heads/{}", &temp_branch);
@@ -296,7 +303,7 @@ pub fn pull(pc: &PathConfig, repo: &mut Repository) -> Result<()> {
                 &[],
             )?;
             info!(
-                "Saved potentially conflicting files on branch <yellow>{}</>",
+                "<bold>Saved:</> Potentially conflicting files on branch <cyan>{}</>.",
                 temp_branch
             );
         }
@@ -347,7 +354,7 @@ where
         Some(StashFlags::INCLUDE_UNTRACKED),
     ) {
         Ok(oid) => {
-            info!("Stashing changes in `{}`.", oid);
+            info!("<bold>Stashed:</> Changes in <cyan>{}</>.", oid);
             Some(oid)
         }
         Err(e) if e.class() == git2::ErrorClass::Stash && e.code() == git2::ErrorCode::NotFound => {
@@ -379,9 +386,9 @@ where
             apply_options.checkout_options(checkout);
 
             repo.stash_apply(index, Some(&mut apply_options))?;
-            info!("Reapplied stash `{}`.", oid);
+            info!("<bold>Applied</> Stash <cyan>{}</>.", oid);
         } else {
-            warn!("Could not find stash `{}`. Ignoring.", oid);
+            warn!("Could not find stash <cyan>{}<cyan>. Ignoring.", oid);
         }
     }
 
@@ -418,7 +425,10 @@ fn fetch_remote<'repo>(pc: &PathConfig, repo: &'repo Repository) -> Result<Remot
         None,
     )?;
     let tracking_branch = pc.config.repos.remote.tracking_branch();
-    info!("Fetched remote branch `{}`.", &tracking_branch);
+    info!(
+        "<bold>Fetched:</> Remote branch <cyan>{}<cyan>.",
+        &tracking_branch
+    );
 
     Ok(remote)
 }
