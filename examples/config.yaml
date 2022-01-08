@@ -20,7 +20,7 @@ packages:
     - $HOME/.bash_profile
     - $HOME/.bashrc
   home-manager:
-    - $HOME/home.nix
+    - $HOME/.config/nixpkgs/home.nix
   homesync:
     - $HOME/.homesync.yml
     - $HOME/.config/homesync/homesync.yml

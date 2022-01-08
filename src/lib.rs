@@ -26,8 +26,8 @@ pub fn run_push(config: PathConfig) -> Result {
 }
 
 pub fn run_pull(config: PathConfig) -> Result {
-    let repo = git::init(&config)?;
-    git::pull(&config, &repo)?;
+    let mut repo = git::init(&config)?;
+    git::pull(&config, &mut repo)?;
     Ok(())
 }
 
