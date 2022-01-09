@@ -12,7 +12,7 @@ fn log_level() -> simplelog::LevelFilter {
 }
 
 #[cfg(not(debug_assertions))]
-fn log_level() {
+fn log_level() -> simplelog::LevelFilter {
     simplelog::LevelFilter::Info
 }
 
