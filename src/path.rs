@@ -8,7 +8,7 @@ use std::{
     env::VarError,
     error,
     ffi::OsString,
-    fmt, fs,
+    fmt,
     hash::{Hash, Hasher},
     io,
     path::{Component, Path, PathBuf},
@@ -196,34 +196,6 @@ impl<'de> Deserialize<'de> for ResPathBuf {
 }
 
 // ========================================
-// Validation
-// ========================================
-
-pub fn validate_is_file(path: &Path) -> Result<()> {
-    let metadata = fs::metadata(path)?;
-    if !metadata.is_file() {
-        // TODO(jrpotter): Use `IsADirectory` when stable.
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("'{}' is not a file.", path.display()),
-        ))?;
-    }
-    Ok(())
-}
-
-pub fn validate_is_dir(path: &Path) -> Result<()> {
-    let metadata = fs::metadata(path)?;
-    if !metadata.is_dir() {
-        // TODO(jrpotter): Use `NotADirectory` when stable.
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("'{}' is not a directory.", path.display()),
-        ))?;
-    }
-    Ok(())
-}
-
-// ========================================
 // Resolution
 // ========================================
 
@@ -236,7 +208,7 @@ pub fn expand(path: &Path) -> Result<PathBuf> {
         match comp {
             Component::Prefix(_) => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "We do not currently support Windows.",
+                "We do not support Windows.",
             ))?,
             Component::RootDir => {
                 expanded.clear();
@@ -290,5 +262,83 @@ pub fn soft_resolve(path: &Path) -> Result<Option<ResPathBuf>> {
         // An ENV variable isn't defined yet, but we assume its possible it'll
         // be defined in the future. Don't report as an error.
         Err(Error::VarError(_)) => Ok(None),
+    }
+}
+
+// ========================================
+// Tests
+// ========================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn respath_absolute() {
+        let abs = Path::new("/home/jrpotter/example");
+        let rel = Path::new("home/jrpotter/example");
+        assert!(ResPathBuf::new(abs, rel).is_ok());
+        assert!(ResPathBuf::new(rel, rel).is_err());
+    }
+
+    #[test]
+    fn respath_equality() {
+        let path = Path::new("/home/jrpotter/example");
+        let res1 = ResPathBuf::new(path, Path::new("rel1")).unwrap();
+        let res2 = ResPathBuf::new(path, Path::new("rel2")).unwrap();
+        assert_eq!(res1, res2);
+    }
+
+    #[test]
+    fn respath_hash() {
+        let mut set = HashSet::new();
+        let path = Path::new("/home/jrpotter/example");
+        let res1 = ResPathBuf::new(path, Path::new("rel1")).unwrap();
+        let res2 = ResPathBuf::new(path, Path::new("rel2")).unwrap();
+        set.insert(res1);
+        set.insert(res2);
+        assert_eq!(set.len(), 1);
+    }
+
+    #[test]
+    fn expand_root_dir() {
+        let current = env::current_dir().unwrap();
+        let expanded = expand(Path::new("")).unwrap();
+        assert_eq!(current, expanded);
+        let expanded = expand(Path::new("/")).unwrap();
+        assert_eq!(Path::new("/"), expanded);
+    }
+
+    #[test]
+    fn expand_component() {
+        env::set_var("EXAMPLE", "example");
+        let expanded = expand(Path::new("/a/b/$EXAMPLE/c")).unwrap();
+        assert_eq!(Path::new("/a/b/example/c"), expanded);
+        let expanded = expand(Path::new("/a/b/pre$EXAMPLE/c")).unwrap();
+        assert_eq!(Path::new("/a/b/pre$EXAMPLE/c"), expanded);
+    }
+
+    #[test]
+    fn resolve() {
+        let path: PathBuf;
+        {
+            let temp = NamedTempFile::new().unwrap();
+            path = temp.path().to_path_buf();
+            assert!(super::resolve(&path).is_ok());
+        }
+        assert!(super::resolve(&path).is_err());
+    }
+
+    #[test]
+    fn soft_resolve() {
+        let path: PathBuf;
+        {
+            let temp = NamedTempFile::new().unwrap();
+            path = temp.path().to_path_buf();
+            assert!(super::soft_resolve(&path).unwrap().is_some());
+        }
+        assert!(super::soft_resolve(&path).unwrap().is_none());
     }
 }

@@ -179,12 +179,20 @@ pub fn stage(pc: &PathConfig) -> Result<()> {
 
 fn get_workdir(pc: &PathConfig) -> Result<ResPathBuf> {
     let workdir = path::resolve(&pc.config.repos.local)?;
-    match Repository::open(workdir.resolved()) {
-        Ok(_) => Ok(workdir),
-        Err(_) => Err(io::Error::new(
+    if let Ok(repo) = Repository::open(workdir.resolved()) {
+        if repo.workdir().is_some() {
+            Ok(workdir)
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "Local repository is --bare.",
+            ))?
+        }
+    } else {
+        Err(io::Error::new(
             io::ErrorKind::NotFound,
             "Local repository not found.",
-        ))?,
+        ))?
     }
 }
 
@@ -226,4 +234,182 @@ fn get_package_lookup(pc: &PathConfig) -> HashMap<PathBuf, Option<ResPathBuf>> {
         }
     }
     seen
+}
+
+// ========================================
+// Tests
+// ========================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{config, path};
+    use git2::Repository;
+    use std::{env, fs::File, io::Write};
+    use tempfile::TempDir;
+
+    // Tests must be serial since we are updating our environment variables.
+    use serial_test::serial;
+
+    // Wrap functionality around this method to ensure the temporary directory
+    // does not go out of scope before we are ready.
+    fn build_home<T: Fn(&config::PathConfig, &Path)>(func: T) {
+        let temp_dir = TempDir::new().unwrap();
+
+        let mut home_dir = temp_dir.path().to_path_buf();
+        home_dir.push("home/owner");
+        fs::create_dir_all(&home_dir).unwrap();
+
+        let mut homesync_yml = home_dir.to_path_buf();
+        homesync_yml.push(".homesync.yml");
+        File::create(&homesync_yml).unwrap();
+        path::resolve(&homesync_yml).unwrap();
+
+        let mut config_homesync_yml = home_dir.to_path_buf();
+        config_homesync_yml.push(".config/homesync");
+        fs::create_dir_all(&config_homesync_yml).unwrap();
+        config_homesync_yml.push("homesync.yml");
+        File::create(&config_homesync_yml).unwrap();
+
+        env::set_var("HOME", &home_dir);
+        env::set_var("XDG_CONFIG_HOME", "");
+
+        let template = path::resolve(Path::new("examples/template.yaml")).unwrap();
+        let config = config::load(&vec![template]).unwrap();
+
+        func(&config, &home_dir);
+    }
+
+    fn build_repo(pc: &PathConfig) -> PathBuf {
+        let repo_dir = path::expand(&pc.config.repos.local).unwrap();
+        Repository::init(&repo_dir).unwrap();
+
+        let mut path = repo_dir.to_path_buf();
+        path.push("b");
+        fs::create_dir(&path).unwrap();
+        path.pop();
+        path.push("a");
+        File::create(&path).unwrap();
+        path.pop();
+        path.push("b/c");
+        File::create(&path).unwrap();
+
+        repo_dir
+    }
+
+    #[test]
+    #[serial]
+    fn walk_repo() {
+        build_home(|pc, _home_dir| {
+            let repo_dir = build_repo(pc);
+            let walked = super::walk_repo(&repo_dir).unwrap();
+            let mut walked: Vec<PathBuf> = walked
+                .iter()
+                .map(|w| w.unresolved().to_path_buf())
+                .collect();
+            walked.sort();
+            assert_eq!(walked, vec![PathBuf::from("a"), PathBuf::from("b/c")]);
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn package_lookup() {
+        build_home(|pc, _home_dir| {
+            let lookup = super::get_package_lookup(pc);
+            assert_eq!(lookup.len(), 4);
+            assert_eq!(
+                lookup
+                    .iter()
+                    .filter(|(_, v)| v.is_some())
+                    .collect::<HashMap<_, _>>()
+                    .len(),
+                2
+            );
+            assert_eq!(
+                lookup
+                    .iter()
+                    .filter(|(_, v)| v.is_none())
+                    .collect::<HashMap<_, _>>()
+                    .len(),
+                2
+            );
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn apply_all() {
+        build_home(|pc, home_dir| {
+            let repo_dir = build_repo(pc);
+            let targets = [".homesync.yml", ".config/homesync/homesync.yml"];
+
+            for target in &targets {
+                let mut repo_path = repo_dir.to_path_buf();
+                repo_path.push(&format!("$HOME/{}", target));
+                fs::create_dir_all(repo_path.parent().unwrap()).unwrap();
+                let mut file = File::create(&repo_path).unwrap();
+                file.write_all(b"Hello, world!").unwrap();
+            }
+
+            super::apply_all(pc).expect("Could not apply packages");
+
+            for target in &targets {
+                let mut home_path = home_dir.to_path_buf();
+                home_path.push(target);
+                let contents = fs::read_to_string(&home_path).unwrap();
+                assert_eq!(contents, "Hello, world!");
+            }
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn apply_one() {
+        build_home(|pc, home_dir| {
+            let repo_dir = build_repo(pc);
+            let targets = [".homesync.yml", ".config/homesync/homesync.yml"];
+
+            for target in &targets {
+                let mut repo_path = repo_dir.to_path_buf();
+                repo_path.push(&format!("$HOME/{}", target));
+                fs::create_dir_all(repo_path.parent().unwrap()).unwrap();
+                let mut file = File::create(&repo_path).unwrap();
+                file.write_all(b"Hello, world!").unwrap();
+            }
+
+            super::apply_one(pc, "homesync").expect("Could not apply `homesync`");
+
+            for target in &targets {
+                let mut home_path = home_dir.to_path_buf();
+                home_path.push(target);
+                let contents = fs::read_to_string(&home_path).unwrap();
+                assert_eq!(contents, "Hello, world!");
+            }
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn stage() {
+        build_home(|pc, _home_dir| {
+            let repo_dir = build_repo(pc);
+            super::stage(pc).expect("Could not stage files.");
+            // Copied over the files in $HOME that exist, and deleted files that
+            // were previously defined but not referenced in the config.
+            let walked = super::walk_repo(&repo_dir).unwrap();
+            let mut walked: Vec<PathBuf> = walked
+                .iter()
+                .map(|w| w.unresolved().to_path_buf())
+                .collect();
+            walked.sort();
+            assert_eq!(
+                walked,
+                vec![
+                    PathBuf::from("$HOME/.config/homesync/homesync.yml"),
+                    PathBuf::from("$HOME/.homesync.yml"),
+                ]
+            );
+        });
+    }
 }
