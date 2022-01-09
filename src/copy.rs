@@ -274,7 +274,7 @@ mod tests {
         env::set_var("HOME", &home_dir);
         env::set_var("XDG_CONFIG_HOME", "");
 
-        let template = path::resolve(Path::new("examples/template.yml")).unwrap();
+        let template = path::resolve(Path::new("rsrc/template.yml")).unwrap();
         let config = config::load(&vec![template]).unwrap();
 
         func(&config, &home_dir);
