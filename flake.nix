@@ -4,13 +4,37 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-21.11";
     flake-utils.url = "github:numtide/flake-utils";
+    cargo2nix.url = "github:cargo2nix/cargo2nix/master";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, cargo2nix, rust-overlay }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
-      in {
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [
+            (import "${cargo2nix}/overlay") rust-overlay.overlay
+          ];
+        };
+
+        rustPkgs = pkgs.rustBuilder.makePackageSet' {
+          rustChannel = "1.56.1";
+          packageFun = import ./Cargo.nix;
+        };
+      in rec {
+        packages = {
+          homesync = (rustPkgs.workspace.homesync {}).bin;
+        };
+
+        defaultPackage = packages.homesync;
+
         devShell = with pkgs; mkShell {
           buildInputs = [
             cargo
