@@ -1,4 +1,5 @@
 use super::{config::PathConfig, path, path::ResPathBuf};
+use git2::Repository;
 use simplelog::{info, paris, warn};
 use std::{
     collections::HashMap,
@@ -7,8 +8,6 @@ use std::{
     path::{Path, PathBuf},
     result,
 };
-
-// TODO(jrpotter): Validate local path is a git repository.
 
 // ========================================
 // Error
@@ -59,7 +58,7 @@ impl error::Error for Error {}
 // ========================================
 
 fn apply_all(pc: &PathConfig) -> Result<()> {
-    let workdir = path::resolve(&pc.config.repos.local)?;
+    let workdir = get_workdir(pc)?;
     let repo_files = walk_repo(workdir.as_ref())?;
     let package_lookup = get_package_lookup(pc);
 
@@ -94,7 +93,7 @@ fn apply_all(pc: &PathConfig) -> Result<()> {
 }
 
 fn apply_one(pc: &PathConfig, package: &str) -> Result<()> {
-    let workdir = path::resolve(&pc.config.repos.local)?;
+    let workdir = get_workdir(pc)?;
 
     if let Some(paths) = pc.config.packages.get(package) {
         for path in paths {
@@ -136,7 +135,7 @@ pub fn apply(pc: &PathConfig, package: Option<&str>) -> Result<()> {
 // ========================================
 
 pub fn stage(pc: &PathConfig) -> Result<()> {
-    let workdir = path::resolve(&pc.config.repos.local)?;
+    let workdir = get_workdir(pc)?;
     let repo_files = walk_repo(workdir.as_ref())?;
     let package_lookup = get_package_lookup(pc);
 
@@ -177,6 +176,17 @@ pub fn stage(pc: &PathConfig) -> Result<()> {
 // ========================================
 // Utility
 // ========================================
+
+fn get_workdir(pc: &PathConfig) -> Result<ResPathBuf> {
+    let workdir = path::resolve(&pc.config.repos.local)?;
+    match Repository::open(workdir.resolved()) {
+        Ok(_) => Ok(workdir),
+        Err(_) => Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "Local repository not found.",
+        ))?,
+    }
+}
 
 fn recursive_walk_repo(root: &Path, path: &Path) -> Result<Vec<ResPathBuf>> {
     let mut seen = Vec::new();

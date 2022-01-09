@@ -5,13 +5,7 @@ use git2::{
     StashFlags,
 };
 use simplelog::{info, paris, warn};
-use std::{
-    collections::HashSet,
-    env::VarError,
-    error, fmt, io,
-    path::{Path, PathBuf},
-    result,
-};
+use std::{collections::HashSet, env::VarError, error, fmt, io, path::Path, result};
 
 // ========================================
 // Error
@@ -246,7 +240,7 @@ fn local_rebase_remote(pc: &PathConfig, repo: &Repository) -> Result<()> {
 }
 
 pub fn pull(pc: &PathConfig, repo: &mut Repository) -> Result<()> {
-    check_working_repo(repo)?;
+    repo.workdir().ok_or(Error::InvalidBareRepo)?;
 
     // If our local branch exists, it must also have a commit on it. Therefore
     // we can apply stashes. Stow away our changes, rebase on remote, and then
@@ -471,8 +465,8 @@ fn get_push_options(pc: &PathConfig) -> Result<PushOptions> {
 // Miscellaneous
 // ========================================
 
-fn check_working_repo(repo: &Repository) -> Result<PathBuf> {
-    Ok(repo.workdir().ok_or(Error::InvalidBareRepo)?.to_path_buf())
+fn now_signature(pc: &PathConfig) -> Result<Signature> {
+    Ok(Signature::now(&pc.config.user.name, &pc.config.user.email)?)
 }
 
 fn get_commit_at_head(repo: &Repository) -> Option<Commit> {
@@ -485,10 +479,6 @@ fn get_commit_at_head(repo: &Repository) -> Option<Commit> {
             .map_err(|_| git2::Error::from_str("Couldn't find commit"))?)
     };
     peel().ok()
-}
-
-fn now_signature(pc: &PathConfig) -> Result<Signature> {
-    Ok(Signature::now(&pc.config.user.name, &pc.config.user.email)?)
 }
 
 fn temporary_branch_name(pc: &PathConfig, repo: &Repository) -> Result<String> {
