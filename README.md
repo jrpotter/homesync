@@ -13,7 +13,38 @@ overwriting local configurations for one or more packages.
 
 ## Installation
 
-TODO
+Currently `nix` is the only distribution channel available. You can run directly
+from the shell like so:
+
+```bash
+$ nix shell github:jrpotter/homesync/main
+```
+
+Likewise, you can install the binary using [home-manager](https://github.com/nix-community/home-manager):
+
+```nix
+{
+  inputs = {
+    homesync.url = "github:jrpotter/homesync/main";
+  };
+
+  # ...
+
+  configuration = { ... }: {
+    home.packages = [
+      homesync.defaultPackage.${system}
+    ];
+  };
+}
+```
+
+Lastly, you can always just build from source:
+
+```bash
+$ git clone https://github.com/jrpotter/homesync.git
+$ cd homesync
+$ cargo build --release
+```
 
 ## Configuration
 

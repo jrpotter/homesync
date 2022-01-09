@@ -9,7 +9,11 @@
 /test/data
 /test/scenarios/inherited/.envrc
 
-# Rust
+# nix
+result
+result-bin/
+
+# rust
 **/*.rs.bk
 *.pdb
 debug/
