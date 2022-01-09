@@ -11,7 +11,6 @@ use std::{
 };
 
 // TODO(jrpotter): Add pid file to only allow one daemon at a time.
-// TODO(jrpotter): Sync files to local git repository.
 
 // ========================================
 // Polling

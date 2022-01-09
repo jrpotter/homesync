@@ -1,6 +1,6 @@
 # homesync
 
-**Caution! This is a work in progress and far from complete!**
+**Caution! This is a work in progress!**
 
 ## Introduction
 
@@ -109,18 +109,15 @@ $ homesync push
 ```
 
 If looking to copy a configuration tracked by homesync to your desktop, you
-can run
+can run either:
 
 ```bash
-$ homesync apply <filename>
+$ homesync apply <PACKAGE>
+$ homesync apply --all
 ```
 
-To copy all configurations (and optionally overwrite files that already exist),
-you can run
-
-```bash
-$ homesync apply --all [--overwrite]
-```
+The latter command overwrites all configuration files in favor of those found in
+the local repository.
 
 ## Known Issues
 
