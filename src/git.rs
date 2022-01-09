@@ -420,7 +420,7 @@ fn fetch_remote<'repo>(pc: &PathConfig, repo: &'repo Repository) -> Result<Remot
     )?;
     let tracking_branch = pc.config.repos.remote.tracking_branch();
     info!(
-        "<bold>Fetched:</> Remote branch <cyan>{}<cyan>.",
+        "<bold>Fetched:</> Remote branch <cyan>{}</>.",
         &tracking_branch
     );
 
