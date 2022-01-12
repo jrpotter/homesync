@@ -3,7 +3,7 @@ set -e
 
 filesToFormat=$(
   git --no-pager diff --name-status --no-color --cached | \
-    awk '$1 != "D" && $2 ~ /\.rs/ {print $2}'
+    awk '$1 != "D" && $2 ~ /\.rs/ {print $NF}'
 )
 
 for path in $filesToFormat

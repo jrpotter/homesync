@@ -4,12 +4,11 @@
 
 ## Introduction
 
-Homesync provides a way of automatically syncing config files across various
-applications you may use. It works by establishing a file watcher on all the
-configs specified in the primary `homesync` config. As files are changed, they
-are copied to a local git repository to eventually be pushed by the user.
-Likewise, at any point, the user can sync against the remote repository,
-overwriting local configurations for one or more packages.
+Homesync provides a way of automatically syncing files across your desktop to a
+<code>git</code> repository. By registering files with homesync, upstream and
+downstream syncing can be done as requested, without any manual need to twiddle
+files and copy them into a local git repository. Separately, a daemon service
+exists that watches for changes as they happen.
 
 ## Installation
 
