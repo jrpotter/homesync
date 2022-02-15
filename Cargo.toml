@@ -8,6 +8,7 @@ applications you may use.
 """
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
 
 [dependencies]
 clap = { version = "3.0.0-rc.9", features = ["derive"] }
