@@ -1,3 +1,5 @@
+//! Utilities for traversing directories and copying files around.
+
 use super::{config::PathConfig, path, path::ResPathBuf};
 use git2::Repository;
 use simplelog::{info, paris, warn};
@@ -122,6 +124,13 @@ fn apply_one(pc: &PathConfig, package: &str) -> Result<()> {
     Ok(())
 }
 
+/// Copy files from the local repository to the corresponding file location on
+/// the current machine.
+///
+/// By default we are required to specify which package we want to apply. If
+/// we'd like, we can choose to apply all files found in the local repository.
+/// Warning! You should probably `pull` first to ensure your local repository is
+/// synced with the remote one, especially if running with `--all`.
 pub fn apply(pc: &PathConfig, package: Option<&str>) -> Result<()> {
     if let Some(package) = package {
         apply_one(pc, package)
@@ -134,6 +143,8 @@ pub fn apply(pc: &PathConfig, package: Option<&str>) -> Result<()> {
 // Staging
 // ========================================
 
+/// Finds all files specified in the homesync config and copies them (if they
+/// exist) into the local repo.
 pub fn stage(pc: &PathConfig) -> Result<()> {
     let workdir = get_workdir(pc)?;
     let repo_files = walk_repo(workdir.as_ref())?;

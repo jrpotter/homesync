@@ -1,3 +1,10 @@
+//! Utilites around launching a filewatcher daemon service.
+//!
+//! This is intended to be the primary use case of Homesync once stable. The
+//! daemon is responsible for loading in the homesync config (reloading as it
+//! changes) and monitoring any files/file paths specified within. On changes,
+//! it will automatically stage the files to the local repository.
+
 use super::{config, config::PathConfig, copy, path, path::ResPathBuf};
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use simplelog::{error, paris, trace, warn};
@@ -137,6 +144,10 @@ impl<'a> WatchState<'a> {
 // Daemon
 // ========================================
 
+/// Launches a daemon service that monitors changes to files specified in the
+/// config and stages them for changes in the local repository.
+///
+/// Warning! This service is still under development.
 pub fn launch(mut pc: PathConfig, freq_secs: u64) -> Result<(), Box<dyn Error>> {
     let (poll_tx, poll_rx) = channel();
     let (watch_tx, watch_rx) = channel();

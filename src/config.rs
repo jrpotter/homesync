@@ -1,3 +1,29 @@
+//! The in-memory representation of the homesync config. Refer to
+//! [homesync/template.yml](https://github.com/jrpotter/homesync/blob/main/rsrc/template.yml)
+//! (copied below) for an example of what this config might look like.
+//!
+//! ```yaml
+//! ---
+//! user:
+//!   name: name
+//!   email: email@email.com
+//! ssh:
+//!   public: $HOME/.ssh/id_ed25519.pub
+//!   private: $HOME/.ssh/id_ed25519
+//! repos:
+//!   local: $HOME/.homesync
+//!   remote:
+//!     name: origin
+//!     branch: master
+//!     url: "https://github.com/owner/repo.git"
+//! packages:
+//!   homesync:
+//!     - $HOME/.homesync.yml
+//!     - $HOME/.config/homesync/homesync.yml
+//!     - $XDG_CONFIG_HOME/homesync.yml
+//!     - $XDG_CONFIG_HOME/homesync/homesync.yml
+//! ```
+
 use super::{path, path::ResPathBuf};
 use paris::formatter::colorize_string;
 use serde_derive::{Deserialize, Serialize};
@@ -134,6 +160,7 @@ impl PathConfig {
 // Loading
 // ========================================
 
+/// The paths our homesync configuration may live in, ordered by priority.
 pub const DEFAULT_PATHS: &[&str] = &[
     "$HOME/.homesync.yml",
     "$HOME/.config/homesync/homesync.yml",
@@ -141,10 +168,13 @@ pub const DEFAULT_PATHS: &[&str] = &[
     "$XDG_CONFIG_HOME/homesync/homesync.yml",
 ];
 
+/// The paths our homesync configuration may live in, ordered by priority.
 pub fn default_paths() -> Vec<PathBuf> {
     DEFAULT_PATHS.iter().map(|s| PathBuf::from(s)).collect()
 }
 
+/// Reads in the homesync configuration file into a [PathConfig](struct.PathConfig.html)
+/// instance.
 pub fn load(candidates: &Vec<ResPathBuf>) -> Result<PathConfig> {
     // When trying our paths, the only acceptable error is a `NotFound` file.
     // Anything else should be surfaced to the end user.
@@ -161,6 +191,11 @@ pub fn load(candidates: &Vec<ResPathBuf>) -> Result<PathConfig> {
     Err(Error::MissingConfig)
 }
 
+/// Reads in the homesync configuration file into a [PathConfig](struct.PathConfig.html)
+/// instance.
+///
+/// Useful in cases where we notice the homesync config itself has changed while
+/// homesync is running.
 pub fn reload(pc: &PathConfig) -> Result<PathConfig> {
     info!(
         "<bold>Reloaded:</> Configuration <cyan>{}</>.",
@@ -173,6 +208,7 @@ pub fn reload(pc: &PathConfig) -> Result<PathConfig> {
 // Listing
 // ========================================
 
+/// Prints the list of packages found in a [PathConfig](struct.PathConfig.html).
 pub fn list_packages(pc: PathConfig) {
     println!(
         "Listing packages in {}...\n",

@@ -133,6 +133,12 @@ Refer to `:h backupcopy` for details on how this works.
 
 ## Contribution
 
+To get started, we recommend reviewing the documentation:
+
+```bash
+cargo doc --open
+```
+
 Install git hooks as follows:
 
 ```bash

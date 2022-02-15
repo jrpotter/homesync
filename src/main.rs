@@ -42,7 +42,7 @@ fn main() {
         )
         .subcommand(
             App::new("apply")
-                .about("Copy files from local repository to rest of desktop")
+                .about("Copy files from local repository to corresponding location")
                 .arg(
                     Arg::new("package")
                         .value_name("PACKAGE")

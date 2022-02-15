@@ -1,3 +1,5 @@
+//! Utilities for resolving paths.
+
 use serde::{
     de,
     de::{Unexpected, Visitor},
@@ -54,6 +56,10 @@ impl error::Error for Error {}
 // Path
 // ========================================
 
+/// A "resolved" `PathBuf` that takes in the originally supplied (potentially
+/// relative) path and annotates it with the absolute path. A `ResPathBuf`
+/// instance cannot be made if the relative path supplied to it does not refer
+/// to an actual file.
 #[derive(Clone, Debug)]
 pub struct ResPathBuf {
     inner: PathBuf,

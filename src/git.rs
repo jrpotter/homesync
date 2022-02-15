@@ -1,3 +1,7 @@
+//! Utilities around git
+//! [plumbing](https://git-scm.com/book/en/v2/Git-Internals-Plumbing-and-Porcelain)
+//! commands.
+
 use super::{config::PathConfig, path};
 use git2::{
     BranchType, Commit, Cred, DiffOptions, Direction, FetchOptions, Index, IndexAddOption,
@@ -83,7 +87,8 @@ fn clone(pc: &PathConfig, expanded: &Path) -> Result<Repository> {
 // for both ensuring any remote repositories are already managed by homesync and
 // for storing any persisted configurations.
 
-/// Sets up a local github repository all configuration files will be synced to.
+/// Sets up a local git repository all configuration files will be synced to.
+///
 /// If there does not exist a local repository at the requested location, we
 /// attempt to make it via cloning or initializing.
 pub fn init(pc: &PathConfig) -> Result<Repository> {
@@ -153,6 +158,11 @@ fn create_readme(repo: &Repository) -> Result<()> {
     Ok(())
 }
 
+/// Take the current state of the local repository and push changes to the
+/// remote.
+///
+/// This method will always pull before pushing to make sure there are no
+/// conflicts that should be resolved.
 pub fn push(pc: &PathConfig, repo: &mut Repository) -> Result<()> {
     // First pull to make sure there are no conflicts when we push our changes.
     // This will also perform validation and construct our local and remote
@@ -260,6 +270,11 @@ fn local_rebase_remote(pc: &PathConfig, repo: &Repository) -> Result<()> {
     Ok(())
 }
 
+/// Take the current state of the remote repository and pull changes to the
+/// local.
+///
+/// Using git parlance, this method will stash any changes that currently exist
+/// and reapply the changes after in case of merge conflicts.
 pub fn pull(pc: &PathConfig, repo: &mut Repository) -> Result<()> {
     repo.workdir().ok_or(Error::InvalidBareRepo)?;
 
