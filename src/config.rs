@@ -16,6 +16,9 @@
 //!     name: origin
 //!     branch: master
 //!     url: "https://github.com/owner/repo.git"
+//! unmanaged:
+//!   - LICENSE
+//!   - README.md
 //! packages:
 //!   homesync:
 //!     - $HOME/.homesync.yml
@@ -28,7 +31,13 @@ use super::{path, path::ResPathBuf};
 use paris::formatter::colorize_string;
 use serde_derive::{Deserialize, Serialize};
 use simplelog::{info, paris};
-use std::{collections::BTreeMap, env::VarError, error, fmt, fs, io, io::Write, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashSet},
+    env::VarError,
+    error, fmt, fs, io,
+    io::Write,
+    path::PathBuf,
+};
 
 // ========================================
 // Error
@@ -124,6 +133,7 @@ pub struct Config {
     pub user: User,
     pub ssh: SSH,
     pub repos: Repos,
+    pub unmanaged: Option<HashSet<PathBuf>>,
     pub packages: BTreeMap<String, Vec<PathBuf>>,
 }
 

@@ -71,6 +71,9 @@ repos:
     name: origin
     branch: master
     url: "https://github.com/owner/repo.git"
+unmanaged:
+  - LICENSE
+  - README.md
 packages:
   homesync:
     - $HOME/.homesync.yml
