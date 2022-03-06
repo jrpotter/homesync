@@ -9,9 +9,7 @@ use git2::{
     StashFlags,
 };
 use simplelog::{info, paris, warn};
-use std::{
-    collections::HashSet, env::VarError, error, fmt, fs::File, io, io::Write, path::Path, result,
-};
+use std::{collections::HashSet, env::VarError, error, fmt, io, path::Path, result};
 
 // ========================================
 // Error
@@ -140,24 +138,6 @@ pub fn init(pc: &PathConfig) -> Result<Repository> {
 // Syncing
 // ========================================
 
-fn create_readme(repo: &Repository) -> Result<()> {
-    let workdir = repo.workdir().ok_or(Error::InvalidBareRepo)?;
-
-    let mut readme = workdir.to_path_buf();
-    readme.push("README.md");
-
-    let mut file = File::create(&readme)?;
-    // TODO(jrpotter): Get the name of the remote repository.
-    file.write_all(
-        "# home-config\n\nThis repository is maintained by \
-        [homesync](https://github.com/jrpotter/homesync)."
-            .as_ref(),
-    )?;
-    info!("Generated new <cyan>README.md</> file.");
-
-    Ok(())
-}
-
 /// Take the current state of the local repository and push changes to the
 /// remote.
 ///
@@ -171,7 +151,6 @@ pub fn push(pc: &PathConfig, repo: &mut Repository) -> Result<()> {
 
     let refspec = format!("refs/heads/{}", &pc.config.repos.remote.branch);
     repo.set_head(&refspec)?;
-    create_readme(repo)?;
 
     // The index corresponds to our staging area. We add all files and write out
     // to a tree. The resulting tree can be found using `git ls-tree <oid>`.
@@ -498,7 +477,7 @@ fn get_push_options(pc: &PathConfig) -> Result<PushOptions> {
 }
 
 // ========================================
-// Miscellaneous
+// Utility
 // ========================================
 
 fn now_signature(pc: &PathConfig) -> Result<Signature> {

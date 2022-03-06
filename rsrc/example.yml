@@ -10,6 +10,9 @@ repos:
     name: origin
     branch: master
     url: "git@github.com:jrpotter/home-config.git"
+unmanaged:
+  - LICENSE
+  - README.md
 packages:
   alacritty:
     - $HOME/.alacritty.yml

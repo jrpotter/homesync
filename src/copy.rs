@@ -153,7 +153,14 @@ pub fn stage(pc: &PathConfig) -> Result<()> {
     // Find all files in our repository that are no longer being referenced in
     // our primary config file. They should be removed from the repository.
     for repo_file in &repo_files {
-        if !package_lookup.contains_key(repo_file.unresolved()) {
+        let unresolved = repo_file.unresolved();
+        if !package_lookup.contains_key(unresolved)
+            && !pc
+                .config
+                .unmanaged
+                .as_ref()
+                .map_or(false, |m| m.contains(unresolved))
+        {
             fs::remove_file(repo_file.resolved())?;
         }
         if let Some(p) = repo_file.resolved().parent() {
