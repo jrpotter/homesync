@@ -1,6 +1,10 @@
 # homesync
 
-**Caution! This is a work in progress!**
+**Caution! This was an experimental project**
+
+This project was an exploration in the Rust language, which I do not plan on
+exploring any further. I do want to rewrite this tool properly (in C) at a
+later date, but I have no definitive timeline on when I'll start.
 
 ## Introduction
 
